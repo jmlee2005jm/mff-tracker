@@ -1,0 +1,181 @@
+.mff-app {
+  min-height: 100vh;
+  background: #f8fafc;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.mff-app.mff-theme-light {
+  color: #0f172a;
+}
+
+.mff-app.mff-theme-dark {
+  background: radial-gradient(circle at top, #1f2937 0%, #0f172a 58%, #020617 100%);
+  color: #e2e8f0;
+  color-scheme: dark;
+}
+
+.mff-app.mff-theme-dark .bg-white {
+  background-color: rgba(31, 41, 55, 0.94) !important;
+}
+
+.mff-mode-pill {
+  border-radius: 9999px;
+  padding: 0.375rem;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.mff-app.mff-theme-light .mff-mode-pill {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.mff-app.mff-theme-dark .mff-mode-pill {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(15, 23, 42, 0.35);
+}
+
+.mff-app.mff-theme-light .bg-white {
+  background-color: #ffffff !important;
+}
+
+.mff-app.mff-theme-light .bg-slate-900.text-white {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.mff-add-button {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+.mff-save-button {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+.mff-app.mff-theme-dark .mff-add-button {
+  background-color: #475569;
+  color: #f8fafc;
+}
+
+.mff-app.mff-theme-dark .mff-save-button {
+  background-color: #475569;
+  color: #f8fafc;
+}
+
+.mff-app.mff-theme-dark .bg-slate-50 {
+  background-color: #020617 !important;
+}
+
+.mff-app.mff-theme-dark .bg-slate-100 {
+  background-color: #111827 !important;
+}
+
+.mff-app.mff-theme-dark .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+
+.mff-app.mff-theme-dark .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+.mff-app.mff-theme-dark .bg-slate-900.text-white {
+  background-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+.mff-app.mff-theme-dark .bg-white.text-slate-900 {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.mff-app.mff-theme-dark .text-slate-900,
+.mff-app.mff-theme-dark .text-gray-900 {
+  color: #e2e8f0 !important;
+}
+
+.mff-app.mff-theme-dark .text-white {
+  color: #f8fafc !important;
+}
+
+.mff-app.mff-theme-dark .text-slate-600,
+.mff-app.mff-theme-dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+.mff-app.mff-theme-dark .text-slate-500,
+.mff-app.mff-theme-dark .text-gray-500 {
+  color: #64748b !important;
+}
+
+.mff-app.mff-theme-dark .border-slate-200,
+.mff-app.mff-theme-dark .border-gray-200 {
+  border-color: #475569 !important;
+}
+
+.mff-app.mff-theme-dark .border-slate-300,
+.mff-app.mff-theme-dark .border-gray-300 {
+  border-color: #64748b !important;
+}
+
+.mff-app.mff-theme-dark .border {
+  border-color: #475569 !important;
+}
+
+.mff-app.mff-theme-dark .bg-green-50 {
+  background-color: rgba(20, 83, 45, 0.32) !important;
+}
+
+.mff-app.mff-theme-dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.32) !important;
+}
+
+.mff-app.mff-theme-dark .bg-blue-50 {
+  background-color: rgba(30, 64, 175, 0.28) !important;
+}
+
+.mff-app.mff-theme-dark .bg-violet-50 {
+  background-color: rgba(91, 33, 182, 0.28) !important;
+}
+
+.mff-app.mff-theme-dark .bg-orange-50 {
+  background-color: rgba(154, 52, 18, 0.28) !important;
+}
+
+.mff-app.mff-theme-dark .shadow-sm {
+  box-shadow: 0 12px 40px rgba(2, 6, 23, 0.32) !important;
+}
+
+.mff-app input:not([type='checkbox']),
+.mff-app select,
+.mff-app textarea {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.mff-app.mff-theme-dark input:not([type='checkbox']),
+.mff-app.mff-theme-dark select,
+.mff-app.mff-theme-dark textarea {
+  background-color: #0f172a;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+.mff-app.mff-theme-dark input::placeholder,
+.mff-app.mff-theme-dark textarea::placeholder {
+  color: #64748b;
+}
+
+.mff-app.mff-theme-dark .hover\:bg-gray-100:hover {
+  background-color: #1e293b !important;
+}
+
+.mff-app.mff-theme-dark .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
+
+.mff-app.mff-theme-light .hover\:bg-slate-100:hover {
+  background-color: #f1f5f9 !important;
+}

@@ -1,0 +1,156 @@
+[
+  {
+    "id": 1,
+    "character": "매직",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 2,
+    "character": "제시카 존스",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 3,
+    "character": "루크 케이지",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 4,
+    "character": "비스트",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 5,
+    "character": "닥터 부두",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 6,
+    "character": "미스터 판타스틱",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 7,
+    "character": "인비저블 우먼",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  },
+  {
+    "id": 8,
+    "character": "매직",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 9,
+    "character": "블루 드래곤",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 10,
+    "character": "썬버드",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 11,
+    "character": "레스큐",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 12,
+    "character": "웨폰 헥스",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 13,
+    "character": "에코",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 14,
+    "character": "고스트",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 15,
+    "character": "옐레나 벨로바",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 16,
+    "character": "카니지",
+    "category": "성장 필요",
+    "detail": "1티→2티",
+    "done": false
+  },
+  {
+    "id": 17,
+    "character": "워 타이거",
+    "category": "성장 필요",
+    "detail": "2티→3티/각초",
+    "done": false
+  },
+  {
+    "id": 18,
+    "character": "비스트",
+    "category": "성장 필요",
+    "detail": "2티→3티/각초",
+    "done": false
+  },
+  {
+    "id": 19,
+    "character": "닥터 부두",
+    "category": "성장 필요",
+    "detail": "2티→3티/각초",
+    "done": false
+  },
+  {
+    "id": 20,
+    "character": "아담 워록",
+    "category": "획득 필요",
+    "detail": "3티/각초→4티",
+    "done": false
+  },
+  {
+    "id": 21,
+    "character": "인비저블 우먼",
+    "category": "획득 필요",
+    "detail": "3티/각초→4티",
+    "done": false
+  },
+  {
+    "id": 22,
+    "character": "데어데블",
+    "category": "유니폼 필요",
+    "detail": "일반",
+    "done": false
+  }
+]
