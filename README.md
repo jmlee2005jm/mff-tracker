@@ -10,7 +10,7 @@ Marvel Future Fight tracker for managing character tasks in a compact React UI.
 - Supports `Character View`, `Category View`, and `Character List`
 - Keeps rows separate from static character metadata
 - Saves data in `localStorage`
-- Supports JSON import and export
+- Supports JSON import and export 
 - Includes filters for name, origin, acquisition, tier, CTP, category, detail, usage, and priority
 
 ## Features
