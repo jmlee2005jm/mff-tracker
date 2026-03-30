@@ -1,16 +1,72 @@
-# React + Vite
+# MFF Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Marvel Future Fight tracker for managing character tasks in a compact React UI.
 
-Currently, two official plugins are available:
+![MFF Tracker screenshot](./public/images/mff-tracker-screenshot.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What It Does
 
-## React Compiler
+- Tracks three task categories: `유니폼 필요`, `성장 필요`, and `획득 필요`
+- Supports `Character View`, `Category View`, and `Character List`
+- Keeps rows separate from static character metadata
+- Saves data in `localStorage`
+- Supports JSON import and export
+- Includes filters for name, origin, acquisition, tier, CTP, category, detail, usage, and priority
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- Character icons with per-character uniform selection
+- Tier badges for `2티`, `각초`, `3티`, and `4티`
+- Acquisition labels such as `수정캐`, `디럭스`, `엑조디아`, and `매생/매엑`
+- Character-level CTP display and picker
+- Row-level usage flags for `PVE` / `PVP`
+- Row priority levels from `!` to `!!!`
+- Drag and drop in `Category View` within the same category
+- Quick add flow when a searched character has no rows yet
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech Stack
+
+- React 19
+- Vite
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the dev server:
+
+```bash
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+## Deployment
+
+This is a static Vite app. The simplest deployment path is:
+
+1. Push the repo to GitHub.
+2. Import the repo into Vercel or Netlify.
+3. Use `npm run build` as the build command.
+4. Use `dist` as the output directory.
+
+## Notes
+
+- Character metadata lives in `src/characterData.js`
+- Main UI state lives in `src/MFFTrackerUI.jsx`
+- Shared tracker logic lives in `src/mffTrackerUtils.js`
+- Reusable character rendering lives in `src/CharacterComponents.jsx`
