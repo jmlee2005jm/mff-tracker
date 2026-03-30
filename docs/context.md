@@ -69,7 +69,7 @@ Upgrade badges are rendered from these icons:
 - Uniform selections are stored per character in `mff_character_uniform_overrides_v1` and can be cleared back to automatic newest resolution
 - The app checks available uniform images lazily with a timeout so the picker does not get stuck on loading
 - Resolved uniform options are cached in `localStorage` with `mff_character_uniform_options_<slug>_v5`
-- The app shows a startup loading screen on a cold cache with only a Korean loading title and bar, builds the versioned uniform cache, and preloads character uniforms before rendering the tracker
+- The app loads non-character icon assets first, then character icon caches in the background, and shows a top-bar status box with the Korean title `캐릭터 아이콘 로딩 중`, a loading bar, and progress numbers; once complete it briefly shows a green check, then hides, and the same area keeps a cache refresh button
 - If no icon can be resolved, the UI falls back to the character’s first letter
 
 ## Persistence
@@ -125,12 +125,11 @@ Upgrade badges are rendered from these icons:
 - The floating bottom island is a frosted PVE/PVP usage filter
 - Both toggles are on by default
 - Both toggles can be on, or both can be off
-- The island label shows `All` when both toggles are on, and that state includes rows with no usage type
-- The island label shows `PVE only` or `PVP only` when exactly one toggle is on
-- When both toggles are off, the view shows rows with no usage type
-- The island label shows `None` when both toggles are off
+- The island exposes three exclusive states, `PVE`, `PVP`, and `All`; `PVE` and `PVP` show their respective rows, and `All` includes both usage types plus rows with no usage type
+- The island defaults to `PVE`
 - The filter changes what is displayed, not where rows are stored
 - Add Entry has a two-button usage selector beside the title that toggles between PVE and PVP, with PVE as the default selection
+- The floating usage island is exclusive and does not allow mixed toggle states
 - Character headers show an optional CTP picker; it defaults to empty for characters without a character-level CTP value, and the trigger is styled like plain display rather than a form control
 - The badge beside that picker is separate CTP priority state, not the row/task priority used in entries
 

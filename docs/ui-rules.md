@@ -23,7 +23,7 @@
 - The bottom island-style usage filter is a frosted floating pill with independent `PVE` and `PVP` toggles
 - Both toggles are on by default
 - Both toggles can be on, or both can be off
-- The island label shows `All` when both toggles are on, and that state includes rows with no usage type
+- The island label shows `All` when both toggles are on, and that state uses a more visible yellow treatment while including rows with no usage type
 - The island label shows `PVE only` or `PVP only` when exactly one toggle is on
 - When both toggles are off, the view shows only rows with no usage type
 - The bottom island changes which rows are displayed, not how rows are stored
@@ -45,7 +45,7 @@
 - Row cards should display `CharacterUsageBadge` for the row-level `usageType`
 - Character icons use a dark fallback tile in light mode and a light fallback tile in dark mode; clicking the icon opens a uniform picker with `Refresh`, `기본`, `자동`, and numbered uniforms, and add-entry previews default to the newest uniform
 - The uniform picker is driven from the character icon itself, persists per character, keeps the base portrait available as a selectable option, and uses a versioned cache so a game update can invalidate the uniform list cleanly
-- The app starts with a Korean loading title and a loading bar only while the icon cache is bootstrapping
+- The icon cache boots in the background and is surfaced in the top utility bar with the Korean title `캐릭터 아이콘 로딩 중`, a loading bar, and numeric progress; when complete, the same box shows a brief green check, then hides, and a cache refresh button remains available in that area
 - In `Category View`, clicking a category entry toggles its completed state directly; the row uses line-through and a soft background instead of lowering opacity, so nested controls stay readable
 - In `Category View`, entries can be dragged only within the same category to a different detail group; cross-category drops are ignored, and growth entries only accept destination detail groups that are valid for that character’s allowed growth branch
 - If icon lookup fails, show a text fallback avatar
@@ -113,9 +113,10 @@
 - Metadata search uses multi-select chip filters for origin type, acquisition label including `일반`, and max tier, plus icon chips for CTP
 - Category filters are multi-select chip groups
 - Detail filters are category-scoped pair chips and can be cleared independently
-- Usage filtering is handled separately by the floating bottom island
+- Usage filtering is handled separately by the floating bottom island, which exposes exclusive `PVE`, `PVP`, and `All` states and defaults to `PVE`
 - Category filter options are derived from the current rows, prefixed with `전체`
 - `Show completed entries` hides completed rows when disabled
 - Reset, File import, and File export actions live in the thin top utility bar, with Reset shown first
+- The top utility bar also shows icon-cache progress during startup and keeps a cache refresh button available afterward
 - Reset requires a second click within 3 seconds
 - A small credit footer appears at the bottom of the page

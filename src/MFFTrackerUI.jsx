@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTPPriorityBadge, CTP_ICON_BY_TYPE } from './CharacterComponents';
+import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTPPriorityBadge } from './CharacterComponents';
 import CtpPicker from './CtpPicker';
+import { CTP_ICON_BY_TYPE } from './iconAssets';
 import {
   CATEGORY_OPTIONS,
   ORIGIN_TYPE_OPTIONS,
@@ -285,7 +286,10 @@ function isDetailValidForCategory(category, character, detail) {
     return isDetailValidForCategory(targetCategory, row.character, targetDetail) ? 'valid' : 'invalid';
   }
 
-export default function MFFTrackerUI() {
+export default function MFFTrackerUI({
+  bootstrapStatus = { phase: 'hidden', loaded: 0, total: 0 },
+  onRefreshBootstrap = () => {},
+}) {
   const [theme, setTheme] = useState(() => {
     try {
       const saved = window.localStorage.getItem(THEME_KEY);
@@ -306,15 +310,22 @@ export default function MFFTrackerUI() {
 
     return 'ko';
   });
-  const [usageFilter, setUsageFilter] = useState(() => {
+  const [usageFilterMode, setUsageFilterMode] = useState(() => {
     try {
       const saved = window.localStorage.getItem(USAGE_FILTER_KEY);
-      if (!saved) return normalizeUsageSelection();
+      if (!saved) return 'PVE';
 
       const parsed = JSON.parse(saved);
-      return normalizeUsageSelection(parsed);
+      if (parsed === 'PVE' || parsed === 'PVP' || parsed === 'All') {
+        return parsed;
+      }
+
+      const normalized = normalizeUsageSelection(parsed);
+      if (normalized.PVE && normalized.PVP) return 'All';
+      if (normalized.PVP) return 'PVP';
+      return 'PVE';
     } catch {
-      return normalizeUsageSelection();
+      return 'PVE';
     }
   });
   const [rows, setRows] = useState(() => loadRows());
@@ -365,7 +376,22 @@ export default function MFFTrackerUI() {
   const importFileRef = useRef(null);
   const characterDropdownItemRefs = useRef([]);
   const rightDockHideTimerRef = useRef(null);
+  const addDrawerRef = useRef(null);
+  const filtersDrawerRef = useRef(null);
+  const addDockButtonRef = useRef(null);
+  const filtersDockButtonRef = useRef(null);
   const [characterCtpPriorityOverrides, setCharacterCtpPriorityOverrides] = useState(() => loadCharacterCtpPriorityOverrides());
+  const usageFilterSelection = useMemo(() => {
+    if (usageFilterMode === 'PVP') {
+      return normalizeUsageSelection({ PVE: false, PVP: true });
+    }
+
+    if (usageFilterMode === 'All') {
+      return normalizeUsageSelection({ PVE: true, PVP: true });
+    }
+
+    return normalizeUsageSelection({ PVE: true, PVP: false });
+  }, [usageFilterMode]);
 
   const openRightDock = () => {
     if (rightDockHideTimerRef.current) {
@@ -412,6 +438,32 @@ export default function MFFTrackerUI() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!showAddDrawer && !showFiltersDrawer) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      const dockRefs = [addDrawerRef, filtersDrawerRef, addDockButtonRef, filtersDockButtonRef];
+      const clickedInsideDock = dockRefs.some((ref) => ref.current && ref.current.contains(target));
+
+      if (clickedInsideDock) {
+        return;
+      }
+
+      setShowAddDrawer(false);
+      setShowFiltersDrawer(false);
+      setShowRightDock(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [showAddDrawer, showFiltersDrawer]);
 
   const getCharacterCtp = (character) => {
     if (Object.prototype.hasOwnProperty.call(characterCtpOverrides, character)) {
@@ -489,11 +541,11 @@ export default function MFFTrackerUI() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(USAGE_FILTER_KEY, JSON.stringify(usageFilter));
+      window.localStorage.setItem(USAGE_FILTER_KEY, JSON.stringify(usageFilterMode));
     } catch {
       // ignore storage errors
     }
-  }, [usageFilter]);
+  }, [usageFilterMode]);
 
   useEffect(() => {
     try {
@@ -635,11 +687,11 @@ export default function MFFTrackerUI() {
         acquisitionType: '전체',
         upgradeLevel: '전체',
       },
-      usageFilter,
+      usageFilterSelection,
       '전체',
       showDone
     );
-  }, [rows, nameQuery, usageFilter, showDone]);
+  }, [rows, nameQuery, usageFilterSelection, showDone]);
 
   const metadataFilteredRows = useMemo(() => {
     const originSet = new Set(selectedOrigins);
@@ -714,11 +766,11 @@ export default function MFFTrackerUI() {
       });
     });
 
-    const usageLabel = getUsageSelectionLabel(usageFilter);
+    const usageLabel = getUsageSelectionLabel(usageFilterSelection);
     if (usageLabel !== 'All') {
       chips.push({
         label: `${t('usage')}: ${translateValue(language, USAGE_LABELS, usageLabel)}`,
-        clear: () => setUsageFilter(normalizeUsageSelection({ PVE: true, PVP: true })),
+        clear: () => setUsageFilterMode('All'),
       });
     }
 
@@ -757,7 +809,7 @@ export default function MFFTrackerUI() {
     selectedOrigins,
     selectedAcquisitions,
     selectedUpgrades,
-    usageFilter,
+    usageFilterSelection,
     minimumPriorityFilter,
     selectedCtps,
     selectedCategories,
@@ -1004,7 +1056,7 @@ export default function MFFTrackerUI() {
     setSelectedAcquisitions([]);
     setSelectedUpgrades([]);
     setSelectedCtps([]);
-    setUsageFilter(normalizeUsageSelection({ PVE: true, PVP: true }));
+      setUsageFilterMode('PVE');
     setSelectedCategories([]);
     setSelectedDetails([]);
     setShowDone(true);
@@ -1155,6 +1207,7 @@ export default function MFFTrackerUI() {
 
         <button
           type="button"
+          ref={filtersDockButtonRef}
           onClick={() => {
             setShowAddDrawer(false);
             setShowFiltersDrawer(true);
@@ -1174,6 +1227,7 @@ export default function MFFTrackerUI() {
 
         <button
           type="button"
+          ref={addDockButtonRef}
           onClick={() => {
             setShowFiltersDrawer(false);
             setShowAddDrawer(true);
@@ -1192,6 +1246,7 @@ export default function MFFTrackerUI() {
         </button>
 
         <div
+          ref={addDrawerRef}
           onMouseEnter={openRightDock}
           className={`fixed right-4 top-1/2 z-[80] w-[28rem] max-w-[80vw] -translate-y-1/2 rounded-3xl border bg-white shadow-2xl p-5 space-y-4 transition-all duration-200 ${
             showAddDrawer
@@ -1434,6 +1489,7 @@ export default function MFFTrackerUI() {
         </div>
 
         <div
+          ref={filtersDrawerRef}
           onMouseEnter={openRightDock}
           className={`fixed right-4 top-1/2 z-[80] w-80 max-w-[80vw] -translate-y-1/2 rounded-3xl border bg-white shadow-2xl p-5 space-y-4 transition-all duration-200 ${
             showFiltersDrawer
@@ -1674,37 +1730,74 @@ export default function MFFTrackerUI() {
         </div>
         <div className="space-y-6">
           <div className="bg-white rounded-3xl shadow-sm border px-4 py-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (showResetConfirm) {
-                  resetAll();
-                } else {
-                  setShowResetConfirm(true);
-                }
-              }}
-              className={`px-4 py-2 rounded-2xl border cursor-pointer ${
-                showResetConfirm ? 'border-red-300 bg-red-50 text-red-700' : ''
-              }`}
-            >
-              {showResetConfirm ? t('resetConfirm') : t('reset')}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (showResetConfirm) {
+                    resetAll();
+                  } else {
+                    setShowResetConfirm(true);
+                  }
+                }}
+                className={`px-4 py-2 rounded-2xl border cursor-pointer ${
+                  showResetConfirm ? 'border-red-300 bg-red-50 text-red-700' : ''
+                }`}
+              >
+                {showResetConfirm ? t('resetConfirm') : t('reset')}
+              </button>
 
-            <button
-              type="button"
-              onClick={() => importFileRef.current?.click()}
-              className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
-            >
-              {t('importFile').replace('\n', ' ')}
-            </button>
+              <button
+                type="button"
+                onClick={() => importFileRef.current?.click()}
+                className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
+              >
+                {t('importFile').replace('\n', ' ')}
+              </button>
 
-            <button
-              type="button"
-              onClick={exportFile}
-              className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
-            >
-              {t('exportFile').replace('\n', ' ')}
-            </button>
+              <button
+                type="button"
+                onClick={exportFile}
+                className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
+              >
+                {t('exportFile').replace('\n', ' ')}
+              </button>
+            </div>
+
+            <div className="ml-auto flex items-center gap-2 rounded-2xl border bg-slate-50 px-4 py-2.5">
+              {bootstrapStatus.phase === 'done' ? (
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-sm font-bold">
+                    ✓
+                  </span>
+                  <span className="text-sm font-medium">{t('loadingIconsDone')}</span>
+                </div>
+              ) : bootstrapStatus.phase === 'loading' ? (
+                <div className="min-w-[14rem] space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-sm font-medium text-slate-700">
+                    <span>{t('loadingIcons')}</span>
+                    <span>
+                      {bootstrapStatus.loaded} / {bootstrapStatus.total}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-slate-900 transition-all duration-200"
+                      style={{
+                        width: `${bootstrapStatus.total > 0 ? Math.round((bootstrapStatus.loaded / bootstrapStatus.total) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={onRefreshBootstrap}
+                className="px-3 py-2 rounded-xl border bg-white text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                {t('refreshCache')}
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-3xl shadow-sm border p-5">
@@ -1747,7 +1840,7 @@ export default function MFFTrackerUI() {
                   {t('showCompletedEntries')}
                 </label>
                 <span className="text-xs px-2 py-1 rounded-full bg-slate-100">
-                  {translateValue(language, USAGE_LABELS, getUsageSelectionLabel(usageFilter))}
+                  {translateValue(language, USAGE_LABELS, getUsageSelectionLabel(usageFilterSelection))}
                 </span>
                 {view === 'character' && (
                   <div className="flex items-center gap-2">
@@ -2245,17 +2338,14 @@ export default function MFFTrackerUI() {
                 key={label}
                 type="button"
                 onClick={() => {
-                  setUsageFilter((current) => ({
-                    ...current,
-                    [label]: !current[label],
-                  }));
+                  setUsageFilterMode(label);
                 }}
                 className={`px-4 py-2 rounded-full text-sm font-medium ${
                   label === 'PVE'
-                    ? usageFilter[label]
+                    ? usageFilterMode === label
                       ? 'bg-sky-200 text-sky-900'
                       : 'bg-slate-100 text-slate-600'
-                    : usageFilter[label]
+                    : usageFilterMode === label
                       ? 'bg-rose-200 text-rose-900'
                       : 'bg-slate-100 text-slate-600'
                 }`}
@@ -2263,11 +2353,22 @@ export default function MFFTrackerUI() {
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setUsageFilterMode('All')}
+              className={`px-4 py-2 rounded-full text-sm font-medium ${
+                usageFilterMode === 'All'
+                  ? 'bg-amber-300 text-amber-950 border border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {t('all')}
+            </button>
           </div>
         </div>
 
         <div className="pb-2 text-center text-[11px] text-slate-400">
-          Built by Jeongmin Lee with Codex. Thanks to the Marvel Future Fight community and thanosvibs.money.
+          Built by JM Lee with Codex. Thanks to the Marvel Future Fight community, especially 겁쟁이들의 쉼터 and thanosvibs.money.
         </div>
       </div>
     </div>

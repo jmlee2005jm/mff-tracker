@@ -1,59 +1,64 @@
 import React, { useEffect, useState } from 'react';
 import MFFTrackerUI from './MFFTrackerUI';
-import { UNIFORM_BOOTSTRAP_KEY, bootstrapUniformAssets } from './uniformBootstrap';
+import {
+  UNIFORM_BOOTSTRAP_KEY,
+  bootstrapUniformAssets,
+  resetUniformBootstrapCache,
+} from './uniformBootstrap';
 
 let bootstrapPromise = null;
 
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 px-6">
-      <div className="w-full max-w-md rounded-3xl border bg-white shadow-sm p-8 space-y-5">
-        <h1 className="text-2xl font-bold text-center">아이콘 캐시를 준비하는 중</h1>
-        <div className="relative h-3 overflow-hidden rounded-full bg-slate-100">
-          <style>{`
-            @keyframes loadingSweep {
-              0% { transform: translateX(-120%); }
-              100% { transform: translateX(420%); }
-            }
-          `}</style>
-          <div
-            className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-slate-900/80"
-            style={{ animation: 'loadingSweep 1.2s ease-in-out infinite' }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
-  const [ready, setReady] = useState(() => {
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 });
+  const [bootstrapPhase, setBootstrapPhase] = useState(() => {
     try {
-      return window.localStorage.getItem(UNIFORM_BOOTSTRAP_KEY) === 'done';
+      return window.localStorage.getItem(UNIFORM_BOOTSTRAP_KEY) === 'done' ? 'hidden' : 'loading';
     } catch {
-      return false;
+      return 'loading';
     }
   });
+  const [bootstrapCycle, setBootstrapCycle] = useState(0);
 
   useEffect(() => {
-    if (ready) return;
-
     let cancelled = false;
+    let doneTimerId = null;
 
     async function runBootstrap() {
+      const shouldBootstrap = (() => {
+        try {
+          return window.localStorage.getItem(UNIFORM_BOOTSTRAP_KEY) !== 'done';
+        } catch {
+          return true;
+        }
+      })();
+
+      if (!shouldBootstrap) {
+        setBootstrapPhase('hidden');
+        return;
+      }
+
+      setProgress({ loaded: 0, total: 0 });
+      setBootstrapPhase('loading');
+      bootstrapPromise = null;
       bootstrapPromise =
-        bootstrapPromise ||
-        bootstrapUniformAssets();
+        bootstrapUniformAssets((loaded, total) => {
+          setProgress({ loaded, total });
+        });
 
       try {
         await bootstrapPromise;
         if (!cancelled) {
           window.localStorage.setItem(UNIFORM_BOOTSTRAP_KEY, 'done');
-          setReady(true);
+          setBootstrapPhase('done');
+          doneTimerId = window.setTimeout(() => {
+            if (!cancelled) {
+              setBootstrapPhase('hidden');
+            }
+          }, 10000);
         }
       } catch {
         if (!cancelled) {
-          setReady(true);
+          setBootstrapPhase('hidden');
         }
       }
     }
@@ -62,12 +67,28 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      if (doneTimerId) {
+        window.clearTimeout(doneTimerId);
+      }
     };
-  }, [ready]);
+  }, [bootstrapCycle]);
 
-  if (!ready) {
-    return <LoadingScreen />;
-  }
+  const refreshBootstrapCache = () => {
+    resetUniformBootstrapCache();
+    bootstrapPromise = null;
+    setProgress({ loaded: 0, total: 0 });
+    setBootstrapPhase('loading');
+    setBootstrapCycle((current) => current + 1);
+  };
 
-  return <MFFTrackerUI />;
+  return (
+    <MFFTrackerUI
+      bootstrapStatus={{
+        phase: bootstrapPhase,
+        loaded: progress.loaded,
+        total: progress.total,
+      }}
+      onRefreshBootstrap={refreshBootstrapCache}
+    />
+  );
 }

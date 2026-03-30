@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CTPBadge } from './CharacterComponents';
+import { DEFAULT_CTP_PREVIEW_ICON } from './iconAssets';
 import { getUiText } from './i18n';
 import { CTP_TYPE_DISPLAY_NAMES, CTP_TYPE_OPTIONS } from './mffTrackerUtils';
-
-const DEFAULT_CTP_PREVIEW_ICON = 'https://thanosvibs.money/static/assets/items/6obelisk.png';
 
 export default function CtpPicker({
   value,

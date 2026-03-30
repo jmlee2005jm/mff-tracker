@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CTP_TYPE_DISPLAY_NAMES, getCharacterEntry } from './mffTrackerUtils';
+import { CTP_ICON_BY_TYPE, UPGRADE_ICON_BY_LEVEL } from './iconAssets';
 import {
   getUiText,
   translateValue,
@@ -24,31 +25,8 @@ const CHARACTER_UNIFORM_CHANGE_EVENT = 'mff:character-uniform-change';
 const CHARACTER_UNIFORM_AUTO = 0;
 const CHARACTER_UNIFORM_BASE = -1;
 
-const UPGRADE_ICON_BY_LEVEL = {
-  '2티': 'https://thanosvibs.money/static/attributes/t2.png',
-  '각초': 'https://thanosvibs.money/static/attributes/tp.png',
-  '3티': 'https://thanosvibs.money/static/attributes/t3.png',
-  '4티': 'https://thanosvibs.money/static/attributes/t4.png',
-};
-
 const DISPLAY_ACQUISITION_TYPES = new Set(['공헌도', '수정캐', '디럭스', '엑조디아', '매생/매엑']);
 export const CTP_TYPES = ['통찰', '극복', '탐욕', '해방', '분노', '경쟁', '파괴', '제련', '권능', '심판', '재생', '격동', '인내', '초월'];
-export const CTP_ICON_BY_TYPE = {
-  통찰: 'https://thanosvibs.money/static/assets/items/ctp_insight.png',
-  극복: 'https://thanosvibs.money/static/assets/items/ctp_conquest.png',
-  탐욕: 'https://thanosvibs.money/static/assets/items/ctp_greed.png',
-  해방: 'https://thanosvibs.money/static/assets/items/ctp_liberation.png',
-  분노: 'https://thanosvibs.money/static/assets/items/ctp_rage.png',
-  경쟁: 'https://thanosvibs.money/static/assets/items/ctp_competition.png',
-  파괴: 'https://thanosvibs.money/static/assets/items/ctp_destruction.png',
-  제련: 'https://thanosvibs.money/static/assets/items/ctp_refinement.png',
-  권능: 'https://thanosvibs.money/static/assets/items/ctp_authority.png',
-  심판: 'https://thanosvibs.money/static/assets/items/ctp_judgement.png',
-  재생: 'https://thanosvibs.money/static/assets/items/ctp_regeneration.png',
-  격동: 'https://thanosvibs.money/static/assets/items/ctp_energy.png',
-  인내: 'https://thanosvibs.money/static/assets/items/ctp_patience.png',
-  초월: 'https://thanosvibs.money/static/assets/items/ctp_transcendence.png',
-};
 const CTP_BADGE_STYLE_BY_TYPE = {
   통찰: 'shadow-[0_0_14px_rgba(168,85,247,0.65),_0_0_24px_rgba(168,85,247,0.38)]',
   극복: 'shadow-[0_0_14px_rgba(59,130,246,0.62),_0_0_24px_rgba(59,130,246,0.36)]',

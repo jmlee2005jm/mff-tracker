@@ -1,9 +1,11 @@
 import { characterNames } from './characterData';
 import { getCharacterEntry } from './mffTrackerUtils';
+import { STATIC_ICON_URLS } from './iconAssets';
 import {
   UNIFORM_CACHE_VERSION,
   getBaseIconUrlBySlug,
   getUniformIconUrlBySlug,
+  clearUniformNumbersCache,
   preloadImage,
   warmUniformNumbersCache,
 } from './iconUtils';
@@ -22,6 +24,16 @@ function getUniqueCharacterSlugs() {
 
 export async function bootstrapUniformAssets(onProgress) {
   const slugs = getUniqueCharacterSlugs();
+  const total = STATIC_ICON_URLS.length + slugs.length;
+  let loaded = 0;
+
+  for (const iconUrl of STATIC_ICON_URLS) {
+    preloadImage(iconUrl);
+    loaded += 1;
+    if (typeof onProgress === 'function') {
+      onProgress(loaded, total);
+    }
+  }
 
   for (let index = 0; index < slugs.length; index += 4) {
     const batch = slugs.slice(index, index + 4);
@@ -36,7 +48,24 @@ export async function bootstrapUniformAssets(onProgress) {
     );
 
     if (typeof onProgress === 'function') {
-      onProgress(results.length);
+      loaded += results.length;
+      onProgress(loaded, total);
     }
+  }
+
+  if (typeof onProgress === 'function' && total === 0) {
+    onProgress(0, 0);
+  }
+}
+
+export function resetUniformBootstrapCache() {
+  try {
+    window.localStorage.removeItem(UNIFORM_BOOTSTRAP_KEY);
+  } catch {
+    // ignore storage errors
+  }
+
+  for (const slug of getUniqueCharacterSlugs()) {
+    clearUniformNumbersCache(slug);
   }
 }
