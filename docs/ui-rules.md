@@ -39,6 +39,7 @@
 - Character names should display `CharacterCTPBadge` when the character metadata has a supported `ctp` subtype such as `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `격동`, `인내`, or `초월`
 - CTP badges are larger, borderless, and glow brightly with a type-colored shadow to signal priority
 - Character headers should include an optional CTP picker; it defaults to empty for characters without a CTP value, and the trigger should read like plain display rather than a visible form control
+- Character headers should also include an optional artifact picker to the left of CTP; it toggles between the placeholder artifact icon and the selected character artifact icon only when the artifact image exists, and shows a slightly wider star badge on the right side of the icon that cycles 3 to 6 when enabled, using a brighter yellow accent color for the enabled state and a red cross emoji when placeholder is selected
 - The small badge shown beside the CTP picker is separate CTP priority state, and should be labeled with `CTP` so it is not confused with row/task priority
 - Character names should display `CharacterOriginBadge` only for tier-born origin types; `일반캐` is not rendered as a badge
 - Character rows should display a priority badge that cycles through `!`, `!!`, and `!!!`
@@ -46,6 +47,7 @@
 - Character icons use a dark fallback tile in light mode and a light fallback tile in dark mode; clicking the icon opens a uniform picker with `Refresh`, `기본`, `자동`, and numbered uniforms, and add-entry previews default to the newest uniform
 - The uniform picker is driven from the character icon itself, persists per character, keeps the base portrait available as a selectable option, and uses a versioned cache so a game update can invalidate the uniform list cleanly
 - The icon cache boots in the background and is surfaced in the top utility bar with the Korean title `캐릭터 아이콘 로딩 중`, a loading bar, and numeric progress; when complete, the same box shows a brief green check, then hides, and a cache refresh button remains available in that area
+- Artifact icons warm after the character icon cache and do not change the progress bar
 - In `Category View`, clicking a category entry toggles its completed state directly; the row uses line-through and a soft background instead of lowering opacity, so nested controls stay readable
 - In `Category View`, entries can be dragged only within the same category to a different detail group; cross-category drops are ignored, and growth entries only accept destination detail groups that are valid for that character’s allowed growth branch
 - If icon lookup fails, show a text fallback avatar
@@ -117,6 +119,9 @@
 - Category filter options are derived from the current rows, prefixed with `전체`
 - `Show completed entries` hides completed rows when disabled
 - Reset, File import, and File export actions live in the thin top utility bar, with Reset shown first
+- File import opens an options dialog that chooses `Merge` or `Replace`; merge import ignores conflicting rows with the same character/category/detail and shows a caution banner
+- File export opens an options dialog that can preserve the current `done` state or force all exported rows to `done: false`, and exported files should include the selected rows plus character-level CTP, CTP priority, and artifact overrides for those characters
+- File export selection is grouped by character in the export dialog, starts fully selected, and lets the user search the export set before choosing rows
 - The top utility bar also shows icon-cache progress during startup and keeps a cache refresh button available afterward
 - Reset requires a second click within 3 seconds
 - A small credit footer appears at the bottom of the page

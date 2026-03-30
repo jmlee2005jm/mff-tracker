@@ -72,6 +72,7 @@ DETAIL_OPTIONS = {
 - `3티` and `각초` occupy the same display tier, so a character should only have one of them
 - `4티` is shown together with `baseUpgradeLevel`, so 4티 characters render two tier badges
 - Character-level CTP is editable from the character header, defaults to empty, and is stored separately from rows
+- Character-level artifact is editable from the character header, defaults to off, and is stored separately from rows as a character-level toggle plus a 3 to 6 star level; if the artifact image does not exist for a character, the toggle remains locked on the placeholder
 - Character-level CTP priority is editable from the character header, defaults to `!`, and is stored separately from rows
 
 ## Usage Model

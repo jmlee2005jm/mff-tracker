@@ -58,9 +58,13 @@ const CTP_TYPE_ALIASES = {
 };
 
 export const DETAIL_OPTIONS = {
-  '유니폼 필요': ['상시 판매', '한정'],
+  '유니폼 필요': ['상시 판매', '한정', '구유니폼'],
   '성장 필요': ['1티→2티', '2티→3티', '2티→각초', '3티→4티', '각초→4티'],
 };
+
+export function isOldUniformDetail(detail) {
+  return detail === '구유니폼';
+}
 
 export function getAcquisitionType(entry) {
   return entry?.acquisitionType || '일반';

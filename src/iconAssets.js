@@ -23,6 +23,11 @@ export const CTP_ICON_BY_TYPE = {
 };
 
 export const DEFAULT_CTP_PREVIEW_ICON = 'https://thanosvibs.money/static/assets/items/6obelisk.png';
+export const DEFAULT_ARTIFACT_PREVIEW_ICON = 'https://thanosvibs.money/static/assets/items/artifact_3.png';
+
+export function getArtifactIconUrlBySlug(slug) {
+  return `https://thanosvibs.money/static/assets/items/artifact_${slug}.png`;
+}
 
 export const STATIC_ICON_URLS = [
   ...Object.values(UPGRADE_ICON_BY_LEVEL),

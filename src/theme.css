@@ -4,6 +4,12 @@
   transition: background-color 180ms ease, color 180ms ease;
 }
 
+.mff-app button,
+.mff-app [role='button'],
+.mff-app a {
+  cursor: pointer;
+}
+
 .mff-app.mff-theme-light {
   color: #0f172a;
 }

@@ -10,7 +10,7 @@ Marvel Future Fight tracker for managing per-character tasks in a single-page Re
 - Render a `Tracking List` view that shows only which characters appear in the current filtered rows
 - Character Tracking and Tracking List keep separate sort controls; Character Tracking defaults to `Last Added` and Tracking List defaults to `Name`
 - Persist rows in `localStorage`
-- Support file import/export
+- Support file import/export with an option dialog: import can `Merge` or `Replace`, and export can preserve `done` state or force all exported rows to `done: false`; exported files use a wrapper object that can carry row data plus character-level overrides
 - Show a character icon, usage badge, origin badge where applicable, acquisition badge, and upgrade badges wherever a character is rendered
 - Support a Korean default UI with an English toggle
 
@@ -31,6 +31,7 @@ Each character entry can include:
 - `acquisitionType` for special display-only acquisition labels
 - `ctp` for a CTP badge using one of `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `격동`, `인내`, or `초월`
 - CTP inputs can be normalized from the English aliases `Insight`, `Conquest`, `Greed`, `Liberation`, `Rage`, `Competition`, `Destruction`, `Refinement`, `Authority`, `Judgement`, `Regeneration`, `Energy`, `Patience`, and `Transcendence`
+- `artifact` for a character-level artifact picker stored as an on/off toggle plus a separate 3 to 6 star level, where the placeholder state means no artifact is selected and characters without a valid artifact image stay locked on that placeholder
 - `iconUniformNumber` when a character needs a pinned portrait number (`0` means the base portrait)
 - `upgradeLevel` for the highest visible tier label
 - `baseUpgradeLevel` for characters whose visible tier is `4티`
@@ -38,6 +39,7 @@ Each character entry can include:
 Rows are saved as a single canonical list. `usageType` lives on each row and controls usage filtering.
 `priority` also lives on each row and stores a 1-to-3 urgency level rendered as `!`, `!!`, or `!!!`.
 Character CTP is edited from the character header, is stored as a separate local UI override, and does not live on rows.
+Character artifact is edited from the character header, is stored as a separate local UI override, and does not live on rows. If the artifact image does not exist for a character, the picker remains on the placeholder icon and cannot toggle on.
 
 Current `originType` values:
 
@@ -69,6 +71,7 @@ Upgrade badges are rendered from these icons:
 - Uniform selections are stored per character in `mff_character_uniform_overrides_v1` and can be cleared back to automatic newest resolution
 - The app checks available uniform images lazily with a timeout so the picker does not get stuck on loading
 - Resolved uniform options are cached in `localStorage` with `mff_character_uniform_options_<slug>_v5`
+- Artifact icon assets are warmed after the character portrait cache and do not affect the loading progress UI
 - The app loads non-character icon assets first, then character icon caches in the background, and shows a top-bar status box with the Korean title `캐릭터 아이콘 로딩 중`, a loading bar, and progress numbers; once complete it briefly shows a green check, then hides, and the same area keeps a cache refresh button
 - If no icon can be resolved, the UI falls back to the character’s first letter
 
@@ -84,10 +87,13 @@ Upgrade badges are rendered from these icons:
 
 - Reset is a two-step confirmation button, not a native double-click action
 - Confirmation expires after 3 seconds
-- Reset clears rows, filters, CTP overrides, and legacy storage keys, then writes an empty array to storage
-- Import accepts a file containing a JSON array of row-shaped objects only
-- Import validation is structural only; it does not verify character names or allowed detail values
+- Reset clears rows, filters, CTP overrides, artifact overrides, and legacy storage keys, then writes an empty array to storage
+- Import accepts either the legacy JSON array of row-shaped objects or the newer wrapper object that contains rows plus character-level overrides
+- Import validation is structural and semantic; invalid characters or invalid category/detail combinations are skipped
 - Import accepts optional `usageType` fields and normalizes missing values
+- Merge import matches duplicates by `character + category + detail`; conflicting imported rows are ignored and the UI shows a caution message
+- Export includes the selected rows plus character-level CTP, CTP priority, and artifact overrides for the exported characters
+- Export lets the user keep `done` as-is or force all exported rows to `done: false`, and the export dialog starts with all rows selected
 - Existing saved rows tagged `PVE` or `PVE/PVP` are migrated once to `PVP` for the current saved dataset
 
 ## Row Editing
@@ -131,6 +137,7 @@ Upgrade badges are rendered from these icons:
 - Add Entry has a two-button usage selector beside the title that toggles between PVE and PVP, with PVE as the default selection
 - The floating usage island is exclusive and does not allow mixed toggle states
 - Character headers show an optional CTP picker; it defaults to empty for characters without a character-level CTP value, and the trigger is styled like plain display rather than a form control
+- Character headers also show an optional artifact picker to the left of CTP; it toggles between a placeholder artifact icon and the selected character artifact icon when the artifact image exists, with a slightly wider star badge on the right side of the icon that cycles 3 to 6 when enabled and shows a red cross emoji when the placeholder is selected
 - The badge beside that picker is separate CTP priority state, not the row/task priority used in entries
 
 ## Growth Detail Rules

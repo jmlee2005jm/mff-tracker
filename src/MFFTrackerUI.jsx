@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTPPriorityBadge } from './CharacterComponents';
+import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTPPriorityBadge, getCharacterUniformOverride } from './CharacterComponents';
 import CtpPicker from './CtpPicker';
+import ArtifactPicker from './ArtifactPicker';
 import { CTP_ICON_BY_TYPE } from './iconAssets';
+import {
+  CHARACTER_ARTIFACT_OVERRIDES_KEY,
+  createDefaultArtifactState,
+  loadCharacterArtifactOverrides,
+  normalizeArtifactState,
+} from './artifactUtils';
 import {
   CATEGORY_OPTIONS,
   ORIGIN_TYPE_OPTIONS,
@@ -25,6 +32,7 @@ import {
   normalizePriority,
   cyclePriority,
   getCharacterDisplayName,
+  isOldUniformDetail,
 } from './mffTrackerUtils';
 import {
   APP_LANGUAGE_KEY,
@@ -68,7 +76,7 @@ function sanitizeText(value) {
 function normalizeLoadedRow(row) {
   if (!isPlainObject(row)) return null;
 
-  const { ctp, ...rest } = row || {};
+  const { ctp, uniformNumber, ...rest } = row || {};
   return {
     id: Number.isInteger(Number(rest.id)) ? Number(rest.id) : 0,
     character: sanitizeText(rest.character),
@@ -80,11 +88,79 @@ function normalizeLoadedRow(row) {
     done: !!rest.done,
     priority: normalizePriority(rest.priority),
     usageType: normalizeUsageType(rest.usageType),
+    uniformNumber: Number.isInteger(Number(uniformNumber)) && Number(uniformNumber) > 0 ? Number(uniformNumber) : 0,
   };
 }
 
 function normalizeImportedRow(row) {
   return normalizeLoadedRow(row);
+}
+
+function isExportPayload(value) {
+  return isPlainObject(value) && Array.isArray(value.rows);
+}
+
+function getCharacterOverrideSubset(overrides, characters) {
+  return Object.fromEntries(
+    characters
+      .filter((character) => Object.prototype.hasOwnProperty.call(overrides, character))
+      .map((character) => [character, overrides[character]])
+  );
+}
+
+function buildExportPayload(rows, ctpOverrides, ctpPriorityOverrides, artifactOverrides) {
+  const characters = Array.from(new Set(rows.map((row) => row.character)));
+
+  return {
+    version: 2,
+    rows,
+    characterOverrides: {
+      ctp: getCharacterOverrideSubset(ctpOverrides, characters),
+      ctpPriority: getCharacterOverrideSubset(ctpPriorityOverrides, characters),
+      artifact: getCharacterOverrideSubset(artifactOverrides, characters),
+    },
+  };
+}
+
+function parseImportPayload(parsed) {
+  if (Array.isArray(parsed)) {
+    return { rows: parsed, characterOverrides: null };
+  }
+
+  if (!isExportPayload(parsed)) {
+    return null;
+  }
+
+  return {
+    rows: parsed.rows,
+    characterOverrides: {
+      ctp: normalizeImportedCtpOverrides(parsed.characterOverrides?.ctp),
+      ctpPriority: normalizeImportedCtpPriorityOverrides(parsed.characterOverrides?.ctpPriority),
+      artifact: normalizeImportedArtifactOverrides(parsed.characterOverrides?.artifact),
+    },
+  };
+}
+
+function normalizeCharacterOverrideMap(map, normalizer) {
+  if (!isPlainObject(map)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(map).map(([name, value]) => [name, normalizer(value)])
+  );
+}
+
+function normalizeImportedArtifactOverrides(map) {
+  return normalizeCharacterOverrideMap(map, normalizeArtifactState);
+}
+
+function normalizeImportedCtpOverrides(map) {
+  return normalizeCharacterOverrideMap(map, normalizeCtpType);
+}
+
+function normalizeImportedCtpPriorityOverrides(map) {
+  return normalizeCharacterOverrideMap(map, normalizePriority);
 }
 
 function loadStoredRows(key) {
@@ -331,6 +407,8 @@ export default function MFFTrackerUI({
   const [rows, setRows] = useState(() => loadRows());
   const [view, setView] = useState('character');
   const [nameQuery, setNameQuery] = useState('');
+  const [showTrackingSearchAutocomplete, setShowTrackingSearchAutocomplete] = useState(false);
+  const [trackingSearchIndex, setTrackingSearchIndex] = useState(0);
   const [selectedOrigins, setSelectedOrigins] = useState([]);
   const [selectedAcquisitions, setSelectedAcquisitions] = useState([]);
   const [selectedUpgrades, setSelectedUpgrades] = useState([]);
@@ -344,6 +422,7 @@ export default function MFFTrackerUI({
   const [rosterSort, setRosterSort] = useState('name');
   const [rosterSortDirection, setRosterSortDirection] = useState('asc');
   const [entryUsageSelection, setEntryUsageSelection] = useState(normalizeUsageSelection({ PVE: true, PVP: false }));
+  const [formUniformNumber, setFormUniformNumber] = useState(0);
   const [form, setForm] = useState({
     character: '',
     category: '유니폼 필요',
@@ -361,15 +440,24 @@ export default function MFFTrackerUI({
   const [editUsageSelection, setEditUsageSelection] = useState(normalizeUsageSelection());
   const [editPriority, setEditPriority] = useState(1);
   const [characterCtpOverrides, setCharacterCtpOverrides] = useState(() => loadCharacterCtpOverrides());
+  const [characterArtifactOverrides, setCharacterArtifactOverrides] = useState(() => loadCharacterArtifactOverrides());
   const [editErrors, setEditErrors] = useState({
     detail: '',
     general: '',
   });
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [transferNotice, setTransferNotice] = useState(null);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
   const [showFiltersDrawer, setShowFiltersDrawer] = useState(false);
   const [showRightDock, setShowRightDock] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [transferDialogKind, setTransferDialogKind] = useState(null);
+  const [importMode, setImportMode] = useState('merge');
+  const [pendingImportMode, setPendingImportMode] = useState('merge');
+  const [exportDoneMode, setExportDoneMode] = useState('asIs');
+  const [exportSearchQuery, setExportSearchQuery] = useState('');
+  const [exportDeselectedRowIds, setExportDeselectedRowIds] = useState([]);
   const [draggingRowId, setDraggingRowId] = useState(null);
   const [dragTargetGroupKey, setDragTargetGroupKey] = useState('');
 
@@ -381,6 +469,21 @@ export default function MFFTrackerUI({
   const addDockButtonRef = useRef(null);
   const filtersDockButtonRef = useRef(null);
   const [characterCtpPriorityOverrides, setCharacterCtpPriorityOverrides] = useState(() => loadCharacterCtpPriorityOverrides());
+  const exportDeselectedRowIdSet = useMemo(() => new Set(exportDeselectedRowIds), [exportDeselectedRowIds]);
+  const isRowExportSelected = (rowId) => !exportDeselectedRowIdSet.has(rowId);
+  const exportFilteredRows = useMemo(
+    () =>
+      rows.filter((row) =>
+        characterMatchesQuery(row.character, exportSearchQuery)
+      ),
+    [rows, exportSearchQuery]
+  );
+  const exportRowsByCharacter = useMemo(() => groupRowsByCharacter(exportFilteredRows), [exportFilteredRows]);
+  const selectedExportRows = useMemo(
+    () => rows.filter((row) => !exportDeselectedRowIdSet.has(row.id)),
+    [rows, exportDeselectedRowIdSet]
+  );
+  const selectedExportRowCount = selectedExportRows.length;
   const usageFilterSelection = useMemo(() => {
     if (usageFilterMode === 'PVP') {
       return normalizeUsageSelection({ PVE: false, PVP: true });
@@ -392,6 +495,117 @@ export default function MFFTrackerUI({
 
     return normalizeUsageSelection({ PVE: true, PVP: false });
   }, [usageFilterMode]);
+  const trackingSearchSuggestions = useMemo(() => {
+    const query = nameQuery.trim();
+    if (!query) return [];
+
+    return characterNames
+      .filter((character) => characterMatchesQuery(character, query))
+      .sort((a, b) =>
+        getCharacterDisplayName(a, language).localeCompare(
+          getCharacterDisplayName(b, language),
+          language === 'en' ? 'en' : 'ko'
+        )
+      )
+      .slice(0, 8);
+  }, [nameQuery, language]);
+
+  useEffect(() => {
+    if (!transferNotice) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setTransferNotice(null);
+    }, 4500);
+
+    return () => window.clearTimeout(timer);
+  }, [transferNotice]);
+
+  const openAddEntryDrawer = (character = '') => {
+    if (!character) {
+      setForm({ character: '', category: '유니폼 필요', detail: '상시 판매' });
+      setErrors({ character: '', detail: '', general: '' });
+      setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: false }));
+      setFormUniformNumber(0);
+      setFilteredCharacters(characterNames);
+      setShowCharacterDropdown(false);
+      setCharacterDropdownIndex(0);
+    }
+
+    setShowFiltersDrawer(false);
+    setShowAddDrawer(true);
+    setShowRightDock(true);
+    if (character) {
+      setForm((prev) => ({
+        ...prev,
+        character,
+      }));
+      setErrors((prev) => ({ ...prev, character: '' }));
+    }
+  };
+
+  const openTransferDialog = (kind) => {
+    setTransferDialogKind(kind);
+    setShowTransferDialog(true);
+    setShowAddDrawer(false);
+    setShowFiltersDrawer(false);
+    setShowRightDock(true);
+    if (kind === 'import') {
+      setImportMode('merge');
+      setPendingImportMode('merge');
+    } else if (kind === 'export') {
+      setExportDoneMode('asIs');
+      setExportSearchQuery('');
+    }
+  };
+
+  const closeTransferDialog = () => {
+    setShowTransferDialog(false);
+    setTransferDialogKind(null);
+  };
+
+  const setExportRowSelected = (rowId, selected) => {
+    setExportDeselectedRowIds((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return Array.from(next);
+    });
+  };
+
+  const setExportCharacterSelected = (character, selected) => {
+    setExportDeselectedRowIds((current) => {
+      const next = new Set(current);
+      rows
+        .filter((row) => row.character === character)
+        .forEach((row) => {
+          if (selected) {
+            next.delete(row.id);
+          } else {
+            next.add(row.id);
+          }
+        });
+      return Array.from(next);
+    });
+  };
+
+  const selectAllExportRows = (targetRows) => {
+    setExportDeselectedRowIds((current) => {
+      const next = new Set(current);
+      targetRows.forEach((row) => next.delete(row.id));
+      return Array.from(next);
+    });
+  };
+
+  const clearAllExportRows = (targetRows) => {
+    setExportDeselectedRowIds((current) => {
+      const next = new Set(current);
+      targetRows.forEach((row) => next.add(row.id));
+      return Array.from(next);
+    });
+  };
 
   const openRightDock = () => {
     if (rightDockHideTimerRef.current) {
@@ -447,7 +661,9 @@ export default function MFFTrackerUI({
     const handlePointerDown = (event) => {
       const target = event.target;
       const dockRefs = [addDrawerRef, filtersDrawerRef, addDockButtonRef, filtersDockButtonRef];
-      const clickedInsideDock = dockRefs.some((ref) => ref.current && ref.current.contains(target));
+      const clickedInsideDock =
+        dockRefs.some((ref) => ref.current && ref.current.contains(target)) ||
+        (target instanceof Element && target.closest('.mff-uniform-menu'));
 
       if (clickedInsideDock) {
         return;
@@ -496,6 +712,27 @@ export default function MFFTrackerUI({
     }));
   };
 
+  const getCharacterArtifact = (character) => {
+    if (Object.prototype.hasOwnProperty.call(characterArtifactOverrides, character)) {
+      return normalizeArtifactState(characterArtifactOverrides[character]);
+    }
+
+    return createDefaultArtifactState();
+  };
+
+  const updateCharacterArtifact = (character, nextArtifactState) => {
+    const currentArtifact = getCharacterArtifact(character);
+    const nextState =
+      typeof nextArtifactState === 'function'
+        ? nextArtifactState(currentArtifact)
+        : nextArtifactState;
+
+    setCharacterArtifactOverrides((current) => ({
+      ...current,
+      [character]: normalizeArtifactState(nextState),
+    }));
+  };
+
   const availableDetailOptions = useMemo(
     () => getAvailableDetailOptions(form.category, form.character),
     [form.category, form.character]
@@ -504,6 +741,7 @@ export default function MFFTrackerUI({
     if (form.category === '획득 필요') return '';
     return availableDetailOptions.includes(form.detail) ? form.detail : availableDetailOptions[0] || '';
   }, [availableDetailOptions, form.category, form.detail]);
+  const formSelectedUniformNumber = formUniformNumber;
 
   const editingAvailableDetailOptions = useMemo(
     () => getAvailableDetailOptions(editingRow?.category || '', editingRow?.character || ''),
@@ -524,11 +762,28 @@ export default function MFFTrackerUI({
       character: name,
       detail: current.category === '성장 필요' ? nextOptions[0] || '' : current.detail,
     }));
+    setFormUniformNumber(0);
     setShowCharacterDropdown(false);
     setCharacterDropdownIndex(0);
     if (errors.character) {
       setErrors({ ...errors, character: '' });
     }
+  };
+
+  const selectTrackingSearchSuggestion = (name) => {
+    setNameQuery(getCharacterDisplayName(name, language));
+    setShowTrackingSearchAutocomplete(false);
+    setTrackingSearchIndex(0);
+  };
+
+  const resetAddEntryForm = () => {
+    setForm({ character: '', category: '유니폼 필요', detail: '상시 판매' });
+    setErrors({ character: '', detail: '', general: '' });
+    setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: false }));
+    setFormUniformNumber(0);
+    setFilteredCharacters(characterNames);
+    setShowCharacterDropdown(false);
+    setCharacterDropdownIndex(0);
   };
 
   useEffect(() => {
@@ -537,6 +792,15 @@ export default function MFFTrackerUI({
     } catch {
       // ignore storage errors
     }
+  }, [rows]);
+
+  useEffect(() => {
+    setExportDeselectedRowIds((current) => {
+      if (!current.length) return current;
+      const rowIdSet = new Set(rows.map((row) => row.id));
+      const next = current.filter((id) => rowIdSet.has(id));
+      return next.length === current.length ? current : next;
+    });
   }, [rows]);
 
   useEffect(() => {
@@ -554,6 +818,14 @@ export default function MFFTrackerUI({
       // ignore storage errors
     }
   }, [characterCtpOverrides]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CHARACTER_ARTIFACT_OVERRIDES_KEY, JSON.stringify(characterArtifactOverrides));
+    } catch {
+      // ignore storage errors
+    }
+  }, [characterArtifactOverrides]);
 
   useEffect(() => {
     try {
@@ -887,6 +1159,8 @@ export default function MFFTrackerUI({
 
     if (category === '성장 필요' && availableDetailOptions.length === 0) {
       newErrors.detail = t('noGrowthOptions');
+    } else if (category === '유니폼 필요' && detail === '구유니폼' && formSelectedUniformNumber <= 0) {
+      newErrors.detail = t('requiredField');
     } else if (category !== '획득 필요' && !isDetailValidForCategory(category, character, detail)) {
       newErrors.detail = t('requiredField');
     }
@@ -921,6 +1195,7 @@ export default function MFFTrackerUI({
         usageType,
         priority,
         done: false,
+        uniformNumber: category === '유니폼 필요' && detail === '구유니폼' ? formSelectedUniformNumber : 0,
       },
     ]);
 
@@ -936,14 +1211,15 @@ export default function MFFTrackerUI({
     });
 
     setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: false }));
+    setFormUniformNumber(0);
   }
 
   function openEditRow(row) {
     setEditingRow({ ...row });
     setEditUsageSelection(
       normalizeUsageSelection({
-        PVE: normalizeUsageType(row.usageType) === 'PVE' || normalizeUsageType(row.usageType) === 'PVE/PVP',
-        PVP: normalizeUsageType(row.usageType) === 'PVP' || normalizeUsageType(row.usageType) === 'PVE/PVP',
+        PVE: normalizeUsageType(row.usageType) !== 'PVP',
+        PVP: normalizeUsageType(row.usageType) === 'PVP',
       })
     );
     setEditPriority(normalizePriority(row.priority));
@@ -1021,6 +1297,16 @@ export default function MFFTrackerUI({
     );
   }
 
+  function updateRowUniformNumber(id, uniformNumber) {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === id
+          ? { ...row, uniformNumber: Number.isInteger(uniformNumber) && uniformNumber > 0 ? uniformNumber : 0 }
+          : row
+      )
+    );
+  }
+
   function removeRow(id) {
     setRows((prev) => prev.filter((row) => row.id !== id));
   }
@@ -1039,18 +1325,31 @@ export default function MFFTrackerUI({
     );
   }
 
-  function exportFile() {
-    const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+  function getRowSignature(row) {
+    return [row.character || '', row.category || '', row.detail || ''].join('||');
+  }
+
+  function exportFile(forceIncomplete = false) {
+    const exportRows = selectedExportRows.map((row) => (forceIncomplete ? { ...row, done: false } : row));
+    const payload = buildExportPayload(
+      exportRows,
+      characterCtpOverrides,
+      characterCtpPriorityOverrides,
+      characterArtifactOverrides
+    );
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = 'mff_tracker.json';
     anchor.click();
     URL.revokeObjectURL(url);
+    setTransferNotice({ kind: 'success', text: t('exportDone') });
   }
 
   function resetAll() {
     setRows([]);
+    setExportDeselectedRowIds([]);
     setNameQuery('');
     setSelectedOrigins([]);
     setSelectedAcquisitions([]);
@@ -1064,7 +1363,9 @@ export default function MFFTrackerUI({
     setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: false }));
     setForm({ character: '', category: '유니폼 필요', detail: '상시 판매' });
     setShowResetConfirm(false);
+    setExportSearchQuery('');
     setCharacterCtpOverrides({});
+    setCharacterArtifactOverrides({});
     setCharacterCtpPriorityOverrides({});
 
     try {
@@ -1074,6 +1375,7 @@ export default function MFFTrackerUI({
         window.localStorage.removeItem(key);
       });
       window.localStorage.removeItem(CHARACTER_CTP_OVERRIDES_KEY);
+      window.localStorage.removeItem(CHARACTER_ARTIFACT_OVERRIDES_KEY);
       window.localStorage.removeItem(CHARACTER_CTP_PRIORITY_OVERRIDES_KEY);
     } catch {
       // ignore storage errors
@@ -1091,17 +1393,20 @@ export default function MFFTrackerUI({
         const text = loadEvent.target?.result;
         const parsed = JSON.parse(text);
 
-        if (!Array.isArray(parsed)) {
+        const payload = parseImportPayload(parsed);
+        const rawRows = payload?.rows || null;
+
+        if (!rawRows) {
           window.alert(t('jsonExpectedArray'));
           return;
         }
 
-        if (parsed.length > 5000) {
+        if (rawRows.length > 5000) {
           window.alert(t('jsonTooManyRows'));
           return;
         }
 
-        const isValid = parsed.every((row) => {
+        const isValid = rawRows.every((row) => {
           return (
             isPlainObject(row) &&
             typeof row.id === 'number' &&
@@ -1119,12 +1424,80 @@ export default function MFFTrackerUI({
           return;
         }
 
-        setRows(parsed.map(normalizeImportedRow).filter(Boolean));
+        const normalizedRows = rawRows.map(normalizeImportedRow).filter(Boolean);
+        const validRows = normalizedRows.filter((row) => {
+          if (!getCharacterEntry(row.character)) {
+            return false;
+          }
+
+          if (row.category === '획득 필요') {
+            return true;
+          }
+
+          return isDetailValidForCategory(row.category, row.character, row.detail);
+        });
+
+        const importedArtifactOverrides = payload?.characterOverrides?.artifact || {};
+        const importedCtpOverrides = payload?.characterOverrides?.ctp || {};
+        const importedCtpPriorityOverrides = payload?.characterOverrides?.ctpPriority || {};
+
+        if (Object.keys(importedArtifactOverrides).length > 0) {
+          setCharacterArtifactOverrides((current) => ({
+            ...current,
+            ...importedArtifactOverrides,
+          }));
+        }
+
+        if (Object.keys(importedCtpOverrides).length > 0) {
+          setCharacterCtpOverrides((current) => ({
+            ...current,
+            ...importedCtpOverrides,
+          }));
+        }
+
+        if (Object.keys(importedCtpPriorityOverrides).length > 0) {
+          setCharacterCtpPriorityOverrides((current) => ({
+            ...current,
+            ...importedCtpPriorityOverrides,
+          }));
+        }
+
+        if (pendingImportMode === 'replace') {
+          setRows(validRows);
+          setExportDeselectedRowIds([]);
+          setTransferNotice({ kind: 'success', text: t('importDone') });
+        } else {
+          const existingSignatures = new Set(rows.map(getRowSignature));
+          let skippedCount = normalizedRows.length - validRows.length;
+          const mergedRows = [...rows];
+
+          validRows.forEach((row) => {
+            const signature = getRowSignature(row);
+            if (existingSignatures.has(signature)) {
+              skippedCount += 1;
+              return;
+            }
+
+            mergedRows.push({
+              ...row,
+              id: getNextId(mergedRows),
+            });
+            existingSignatures.add(signature);
+          });
+
+          setRows(mergedRows);
+          setTransferNotice(
+            skippedCount > 0
+              ? { kind: 'warning', text: t('importMergeWarning') }
+              : { kind: 'success', text: t('importDone') }
+          );
+        }
         setShowResetConfirm(false);
       } catch {
         window.alert(t('jsonFailed'));
       } finally {
         event.target.value = '';
+        closeTransferDialog();
       }
     };
 
@@ -1229,8 +1602,7 @@ export default function MFFTrackerUI({
           type="button"
           ref={addDockButtonRef}
           onClick={() => {
-            setShowFiltersDrawer(false);
-            setShowAddDrawer(true);
+            openAddEntryDrawer();
           }}
           onMouseEnter={openRightDock}
           onMouseLeave={closeRightDockSoon}
@@ -1256,22 +1628,58 @@ export default function MFFTrackerUI({
         >
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">{t('addEntry')}</h2>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAddDrawer(false);
-                setShowRightDock(false);
-              }}
-              className="text-sm px-3 py-1.5 rounded-full border bg-slate-100 text-slate-700"
-            >
-              {t('close')}
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                {['PVE', 'PVP'].map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setEntryUsageSelection((current) => {
+                        const nextValue =
+                          label === 'PVE'
+                            ? current.PVE
+                              ? { PVE: false, PVP: true }
+                              : { PVE: true, PVP: false }
+                            : current.PVP
+                              ? { PVE: true, PVP: false }
+                              : { PVE: false, PVP: true };
+
+                        return normalizeUsageSelection(nextValue);
+                      });
+                    }}
+                    aria-pressed={!!entryUsageSelection[label]}
+                    className={`px-3 py-2 rounded-2xl border text-sm font-medium ${
+                      label === 'PVE'
+                        ? entryUsageSelection[label]
+                          ? 'bg-sky-200 text-sky-900 border-sky-300'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                        : entryUsageSelection[label]
+                          ? 'bg-rose-200 text-rose-900 border-rose-300'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddDrawer(false);
+                  setShowRightDock(false);
+                }}
+                className="text-sm px-3 py-1.5 rounded-full border bg-slate-100 text-slate-700"
+              >
+                {t('close')}
+              </button>
+            </div>
           </div>
           <form onSubmit={addRow} className="space-y-3">
             <div>
               <label className="text-sm font-medium">{t('character')}</label>
-              <div className="relative flex items-center">
-                <input
+                    <div className="relative flex items-center gap-2">
+                      <input
                   value={form.character}
                   onChange={(event) => {
                     const value = event.target.value;
@@ -1392,6 +1800,9 @@ export default function MFFTrackerUI({
                     category: nextCategory,
                     detail: nextOptions[0] || '',
                   });
+                  if (nextCategory !== '유니폼 필요' || nextOptions[0] !== '구유니폼') {
+                    setFormUniformNumber(0);
+                  }
                 }}
                 className="w-full mt-1 px-3 py-2 rounded-2xl border"
               >
@@ -1405,31 +1816,46 @@ export default function MFFTrackerUI({
             {form.category !== '획득 필요' && (
               <div>
                 <label className="text-sm font-medium">{t('detail')}</label>
-                <select
-                  value={formDetailValue}
-                  disabled={availableDetailOptions.length === 0}
-                  onChange={(event) => {
-                    setForm({ ...form, detail: event.target.value });
-                    if (errors.detail) {
-                      setErrors({ ...errors, detail: '' });
-                    }
-                  }}
-                  className={`w-full mt-1 px-3 py-2 rounded-2xl border ${
-                    errors.detail ? 'border-red-500' : ''
-                  }`}
-                >
-                  {availableDetailOptions.length > 0 ? (
-                    availableDetailOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {translateValue(language, DETAIL_LABELS, option)}
+                <div className="mt-1 flex items-center gap-2">
+                  <select
+                    value={formDetailValue}
+                    disabled={availableDetailOptions.length === 0}
+                    onChange={(event) => {
+                      setForm({ ...form, detail: event.target.value });
+                      if (errors.detail) {
+                        setErrors({ ...errors, detail: '' });
+                      }
+                      if (event.target.value !== '구유니폼') {
+                        setFormUniformNumber(0);
+                      }
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-2xl border ${
+                      errors.detail ? 'border-red-500' : ''
+                    }`}
+                  >
+                    {availableDetailOptions.length > 0 ? (
+                      availableDetailOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {translateValue(language, DETAIL_LABELS, option)}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        -
                       </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>
-                      -
-                    </option>
-                  )}
-                </select>
+                    )}
+                  </select>
+                  {form.category === '유니폼 필요' && formDetailValue === '구유니폼' ? (
+                    <CharacterIcon
+                      name={form.character}
+                      preferLatest
+                      language={language}
+                      uniformSelectionNumber={formSelectedUniformNumber}
+                      onUniformSelect={setFormUniformNumber}
+                      keepOpenOnSelect
+                    />
+                  ) : null}
+                </div>
 
                 {errors.detail && (
                   <p className="text-red-500 text-xs mt-1">{errors.detail}</p>
@@ -1437,42 +1863,17 @@ export default function MFFTrackerUI({
               </div>
             )}
             <div className="flex items-center gap-2">
-              {['PVE', 'PVP'].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => {
-                    setEntryUsageSelection((current) => {
-                      const nextValue =
-                        label === 'PVE'
-                          ? current.PVE
-                            ? { PVE: false, PVP: true }
-                            : { PVE: true, PVP: false }
-                          : current.PVP
-                            ? { PVE: true, PVP: false }
-                            : { PVE: false, PVP: true };
-
-                      return normalizeUsageSelection(nextValue);
-                    });
-                  }}
-                  aria-pressed={!!entryUsageSelection[label]}
-                  className={`px-3 py-2 rounded-2xl border text-sm font-medium ${
-                    label === 'PVE'
-                      ? entryUsageSelection[label]
-                        ? 'bg-sky-200 text-sky-900 border-sky-300'
-                        : 'bg-slate-100 text-slate-600 border-slate-200'
-                      : entryUsageSelection[label]
-                        ? 'bg-rose-200 text-rose-900 border-rose-300'
-                        : 'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <button className="mff-add-button flex-1 px-4 py-2 rounded-2xl font-medium cursor-pointer">
+                {t('addEntry')}
+              </button>
+              <button
+                type="button"
+                onClick={resetAddEntryForm}
+                className="px-4 py-2 rounded-2xl border bg-slate-100 text-slate-700 cursor-pointer"
+              >
+                {t('reset')}
+              </button>
             </div>
-            <button className="mff-add-button w-full px-4 py-2 rounded-2xl font-medium cursor-pointer">
-              {t('addEntry')}
-            </button>
           </form>
 
           {successMessage && (
@@ -1749,7 +2150,7 @@ export default function MFFTrackerUI({
 
               <button
                 type="button"
-                onClick={() => importFileRef.current?.click()}
+                onClick={() => openTransferDialog('import')}
                 className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
               >
                 {t('importFile').replace('\n', ' ')}
@@ -1757,7 +2158,7 @@ export default function MFFTrackerUI({
 
               <button
                 type="button"
-                onClick={exportFile}
+                onClick={() => openTransferDialog('export')}
                 className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
               >
                 {t('exportFile').replace('\n', ' ')}
@@ -1800,6 +2201,18 @@ export default function MFFTrackerUI({
             </div>
           </div>
 
+          {transferNotice && (
+            <div
+              className={`rounded-2xl border px-4 py-3 text-sm ${
+                transferNotice.kind === 'warning'
+                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              }`}
+            >
+              {transferNotice.text}
+            </div>
+          )}
+
           <div className="bg-white rounded-3xl shadow-sm border p-5">
               <div className="flex items-center justify-between gap-4 mb-4 flex-nowrap">
               <div className="flex items-center gap-3 min-w-0 flex-nowrap">
@@ -1818,8 +2231,39 @@ export default function MFFTrackerUI({
                 />
                 <div className="relative flex-1 min-w-0 max-w-[28rem]">
                   <input
+                    onFocus={() => {
+                      if (nameQuery.trim()) {
+                        setShowTrackingSearchAutocomplete(true);
+                      }
+                    }}
                     value={nameQuery}
-                    onChange={(event) => setNameQuery(event.target.value)}
+                    onChange={(event) => {
+                      setNameQuery(event.target.value);
+                      setShowTrackingSearchAutocomplete(true);
+                      setTrackingSearchIndex(0);
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(() => setShowTrackingSearchAutocomplete(false), 120);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!showTrackingSearchAutocomplete || trackingSearchSuggestions.length === 0) return;
+
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        setTrackingSearchIndex((current) => (current + 1) % trackingSearchSuggestions.length);
+                      } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        setTrackingSearchIndex((current) => (current - 1 + trackingSearchSuggestions.length) % trackingSearchSuggestions.length);
+                      } else if (event.key === 'Enter') {
+                        event.preventDefault();
+                        const selected = trackingSearchSuggestions[trackingSearchIndex];
+                        if (selected) {
+                          selectTrackingSearchSuggestion(selected);
+                        }
+                      } else if (event.key === 'Escape') {
+                        setShowTrackingSearchAutocomplete(false);
+                      }
+                    }}
                     placeholder={t('search')}
                     className="w-full pl-10 pr-3 py-2 rounded-2xl border"
                   />
@@ -1828,6 +2272,27 @@ export default function MFFTrackerUI({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
+                  {showTrackingSearchAutocomplete && trackingSearchSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl border bg-white shadow-2xl z-40 overflow-hidden">
+                      {trackingSearchSuggestions.map((suggestion, index) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            selectTrackingSearchSuggestion(suggestion);
+                          }}
+                          className={`w-full px-4 py-3 text-left text-sm ${
+                            index === trackingSearchIndex
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {getCharacterDisplayName(suggestion, language)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
@@ -1926,10 +2391,7 @@ export default function MFFTrackerUI({
                     <button
                       type="button"
                       onClick={() => {
-                        setForm((prev) => ({
-                          ...prev,
-                          character: quickAddCharacter,
-                        }));
+                        openAddEntryDrawer(quickAddCharacter);
                         setErrors({ character: '', detail: '', general: '' });
                       }}
                       className="px-4 py-2 rounded-2xl border bg-slate-900 text-white cursor-pointer"
@@ -1945,20 +2407,55 @@ export default function MFFTrackerUI({
                 )}
                 {displayedGroupedByCharacter.map(([character, items]) => {
                   const characterCtp = getCharacterCtp(character);
+                  const characterArtifact = getCharacterArtifact(character);
+                  const artifactEnabled = characterArtifact.enabled;
+                  const artifactStar = characterArtifact.star;
 
                   return (
                     <div key={character} className="rounded-3xl border p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <CharacterIcon name={character} theme={theme} language={language} />
+                            <CharacterIcon name={character} theme={theme} language={language} />
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-lg font-semibold">{getCharacterDisplayName(character, language)}</h3>
-                            <CharacterUpgradeBadges name={character} language={language} />
-                            <CharacterAcquisitionBadge name={character} language={language} />
-                            <CharacterOriginBadge name={character} language={language} />
+                              <h3 className="text-lg font-semibold">{getCharacterDisplayName(character, language)}</h3>
+                              <CharacterUpgradeBadges name={character} language={language} />
+                              <CharacterAcquisitionBadge name={character} language={language} />
+                              <CharacterOriginBadge name={character} language={language} />
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openAddEntryDrawer(character);
+                                }}
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-full border bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200"
+                                title={t('quickAdd')}
+                                aria-label={t('quickAdd')}
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
-                        </div>
                         <div className="flex items-center gap-2">
+                          <ArtifactPicker
+                            name={character}
+                            enabled={artifactEnabled}
+                            starLevel={artifactStar}
+                            onToggle={() =>
+                              updateCharacterArtifact(character, (current) =>
+                                current.enabled
+                                  ? createDefaultArtifactState()
+                                  : { enabled: 1, star: 3 }
+                              )
+                            }
+                            onCycleStar={() =>
+                              updateCharacterArtifact(character, (current) => ({
+                                enabled: 1,
+                                star: current.enabled && current.star >= 3 && current.star <= 5 ? current.star + 1 : 3,
+                              }))
+                            }
+                            align="right"
+                            language={language}
+                          />
                           <CtpPicker
                             value={characterCtp}
                             onChange={(next) => updateCharacterCtp(character, next)}
@@ -1992,13 +2489,25 @@ export default function MFFTrackerUI({
                                 <span className="text-white text-sm font-bold">✓</span>
                               )}
                             </button>
-                            <div className="flex-1 min-w-0">
-                              <div className={`font-medium ${item.done ? 'line-through text-slate-400' : ''}`}>
-                                {translateValue(language, CATEGORY_LABELS, item.category)}
+                            <div className="flex-1 min-w-0 flex items-center gap-3">
+                              <div className="min-w-0">
+                                <div className={`font-medium ${item.done ? 'line-through text-slate-400' : ''}`}>
+                                  {translateValue(language, CATEGORY_LABELS, item.category)}
+                                </div>
+                                <div className={`text-sm text-slate-600 ${item.done ? 'line-through text-slate-400' : ''}`}>
+                                  {translateValue(language, DETAIL_LABELS, item.detail)}
+                                </div>
                               </div>
-                              <div className={`text-sm text-slate-600 ${item.done ? 'line-through text-slate-400' : ''}`}>
-                                {translateValue(language, DETAIL_LABELS, item.detail)}
-                              </div>
+                              {item.category === '유니폼 필요' && isOldUniformDetail(item.detail) ? (
+                                <CharacterIcon
+                                  name={item.character}
+                                  preferLatest
+                                  language={language}
+                                  uniformSelectionNumber={item.uniformNumber > 0 ? item.uniformNumber : 0}
+                                  onUniformSelect={(next) => updateRowUniformNumber(item.id, next)}
+                                  keepOpenOnSelect
+                                />
+                              ) : null}
                             </div>
                             <PriorityBadge
                               priority={item.priority}
@@ -2006,6 +2515,15 @@ export default function MFFTrackerUI({
                               language={language}
                             />
                             <CharacterUsageBadge usageType={item.usageType} language={language} />
+                            <button
+                              type="button"
+                              onClick={() => openAddEntryDrawer(item.character)}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full border bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200"
+                              title={t('quickAdd')}
+                              aria-label={t('quickAdd')}
+                            >
+                              +
+                            </button>
                             <button
                               type="button"
                               onClick={() => openEditRow(item)}
@@ -2031,6 +2549,9 @@ export default function MFFTrackerUI({
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {displayedGroupedByCharacter.map(([character, items]) => {
                   const characterCtp = getCharacterCtp(character);
+                  const characterArtifact = getCharacterArtifact(character);
+                  const artifactEnabled = characterArtifact.enabled;
+                  const artifactStar = characterArtifact.star;
 
                   return (
                     <div key={character} className="rounded-3xl border p-4">
@@ -2043,6 +2564,26 @@ export default function MFFTrackerUI({
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          <ArtifactPicker
+                            name={character}
+                            enabled={artifactEnabled}
+                            starLevel={artifactStar}
+                            onToggle={() =>
+                              updateCharacterArtifact(character, (current) =>
+                                current.enabled
+                                  ? createDefaultArtifactState()
+                                  : { enabled: 1, star: 3 }
+                              )
+                            }
+                            onCycleStar={() =>
+                              updateCharacterArtifact(character, (current) => ({
+                                enabled: 1,
+                                star: current.enabled && current.star >= 3 && current.star <= 5 ? current.star + 1 : 3,
+                              }))
+                            }
+                            align="right"
+                            language={language}
+                          />
                           <CtpPicker
                             value={characterCtp}
                             onChange={(next) => updateCharacterCtp(character, next)}
@@ -2059,11 +2600,20 @@ export default function MFFTrackerUI({
                           />
                         </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CharacterUpgradeBadges name={character} language={language} />
-                        <CharacterAcquisitionBadge name={character} language={language} />
-                        <CharacterOriginBadge name={character} language={language} />
-                      </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <CharacterUpgradeBadges name={character} language={language} />
+                          <CharacterAcquisitionBadge name={character} language={language} />
+                          <CharacterOriginBadge name={character} language={language} />
+                          <button
+                            type="button"
+                            onClick={() => openAddEntryDrawer(character)}
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-full border bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200"
+                            title={t('quickAdd')}
+                            aria-label={t('quickAdd')}
+                          >
+                            +
+                          </button>
+                        </div>
                     </div>
                   );
                 })}
@@ -2176,12 +2726,28 @@ export default function MFFTrackerUI({
                               item.done ? 'bg-slate-50 border-slate-200' : 'bg-white'
                             }`}
                           >
-                            <CharacterIcon name={item.character} theme={theme} language={language} />
+                            <CharacterIcon
+                              name={item.character}
+                              theme={theme}
+                              language={language}
+                            />
                             <span className={`max-w-36 truncate text-sm font-medium ${item.done ? 'line-through text-slate-400' : ''}`}>
                               {getCharacterDisplayName(item.character, language)}
                             </span>
                             <CharacterAcquisitionBadge name={item.character} language={language} />
                             <CharacterOriginBadge name={item.character} language={language} />
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openAddEntryDrawer(item.character);
+                              }}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full border bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200"
+                              title={t('quickAdd')}
+                              aria-label={t('quickAdd')}
+                            >
+                              +
+                            </button>
                             <PriorityBadge
                               priority={item.priority}
                               onClick={() => cycleRowPriority(item.id)}
@@ -2199,6 +2765,207 @@ export default function MFFTrackerUI({
             )}
           </div>
         </div>
+
+        {showTransferDialog && transferDialogKind && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/40">
+            <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border p-6 space-y-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-xl font-semibold">
+                    {transferDialogKind === 'import' ? t('importOptions') : t('exportOptions')}
+                  </h3>
+                  {transferDialogKind === 'export' && (
+                    <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={exportDoneMode === 'forceFalse'}
+                        onChange={(event) => setExportDoneMode(event.target.checked ? 'forceFalse' : 'asIs')}
+                      />
+                      {t('keepDone')}
+                    </label>
+                  )}
+                </div>
+                {transferDialogKind === 'import' && (
+                  <p className="text-sm text-amber-700 mt-1">{t('importMergeWarning')}</p>
+                )}
+              </div>
+
+                {transferDialogKind === 'import' ? (
+                <div className="space-y-2">
+                  {[
+                    ['merge', t('mergeImport')],
+                    ['replace', t('replaceImport')],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setImportMode(value)}
+                      className={`w-full px-4 py-3 rounded-2xl border text-left ${
+                        importMode === value
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border bg-slate-50 px-4 py-3">
+                    <div className="text-sm font-medium text-slate-700">{t('selectedRowsOnly')}</div>
+                    <div className="mt-2 relative">
+                      <input
+                        value={exportSearchQuery}
+                        onChange={(event) => setExportSearchQuery(event.target.value)}
+                        placeholder={t('search')}
+                        className="w-full pl-10 pr-3 py-2 rounded-xl border bg-white text-sm"
+                      />
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => selectAllExportRows(exportFilteredRows)}
+                        className="px-3 py-1.5 rounded-xl border bg-white text-sm"
+                      >
+                        {t('selectAllRows')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => clearAllExportRows(exportFilteredRows)}
+                        className="px-3 py-1.5 rounded-xl border bg-white text-sm"
+                      >
+                        {t('clearAllRows')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto rounded-2xl border bg-white">
+                    <div className="space-y-3 p-3">
+                      {exportRowsByCharacter.map(([character, groupedRows]) => {
+                        const allSelected = groupedRows.every((row) => isRowExportSelected(row.id));
+                        const someSelected = groupedRows.some((row) => isRowExportSelected(row.id));
+                        const groupState = allSelected ? 'selected' : someSelected ? 'partial' : 'none';
+
+                        return (
+                          <div
+                            key={character}
+                            className={`rounded-2xl border p-3 ${
+                              groupState === 'selected'
+                                ? theme === 'dark'
+                                  ? 'border-emerald-500 bg-emerald-900/80 text-emerald-50'
+                                  : 'border-emerald-300 bg-emerald-100'
+                                : theme === 'dark'
+                                  ? 'border-slate-700 bg-slate-900/60'
+                                  : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <label className="flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                ref={(el) => {
+                                  if (el) {
+                                    el.indeterminate = groupState === 'partial';
+                                  }
+                                }}
+                                onChange={(event) => setExportCharacterSelected(character, event.target.checked)}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium truncate">{getCharacterDisplayName(character, language)}</div>
+                                <div className="text-xs text-slate-500">{groupedRows.length} {t('items')}</div>
+                              </div>
+                            </label>
+                            <div className="mt-3 space-y-2">
+                              {groupedRows.map((row) => {
+                                const selected = isRowExportSelected(row.id);
+                                return (
+                                  <label
+                                    key={row.id}
+                                    className={`flex items-center gap-3 px-3 py-2 rounded-xl border cursor-pointer ${
+                                      selected
+                                        ? theme === 'dark'
+                                          ? 'bg-emerald-700 border-emerald-400 text-white'
+                                          : 'bg-emerald-200 border-emerald-400'
+                                        : theme === 'dark'
+                                          ? 'bg-slate-950 border-slate-700 text-slate-200'
+                                          : 'bg-white border-slate-200'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      onChange={(event) => setExportRowSelected(row.id, event.target.checked)}
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium truncate">
+                                        {translateValue(language, CATEGORY_LABELS, row.category)}
+                                      </div>
+                                      <div className="text-xs truncate">
+                                        {translateValue(language, DETAIL_LABELS, row.detail)}
+                                      </div>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {exportRowsByCharacter.length === 0 && (
+                        <div className="px-3 py-8 text-center text-sm text-slate-500">
+                          {t('noEntries')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeTransferDialog}
+                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer"
+                >
+                  {t('cancel')}
+                </button>
+                {transferDialogKind === 'import' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingImportMode(importMode);
+                      closeTransferDialog();
+                      importFileRef.current?.click();
+                    }}
+                    className="flex-1 px-4 py-2 rounded-2xl border bg-slate-900 text-white cursor-pointer"
+                  >
+                    {t('continueAction')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedExportRowCount) return;
+                      exportFile(exportDoneMode === 'forceFalse');
+                      closeTransferDialog();
+                    }}
+                    disabled={!selectedExportRowCount}
+                    className={`flex-1 px-4 py-2 rounded-2xl border bg-slate-900 text-white cursor-pointer ${
+                      !selectedExportRowCount ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {t('exportNow')}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {editingRow && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -2258,11 +3025,12 @@ export default function MFFTrackerUI({
                         key={label}
                         type="button"
                         onClick={() => {
-                        setEditUsageSelection((current) => ({
-                          ...current,
-                          [label]: !current[label],
-                        }));
-                      }}
+                          setEditUsageSelection(
+                            label === 'PVE'
+                              ? normalizeUsageSelection({ PVE: true, PVP: false })
+                              : normalizeUsageSelection({ PVE: false, PVP: true })
+                          );
+                        }}
                         className={`px-3 py-2 rounded-2xl border text-sm font-medium ${
                           label === 'PVE'
                             ? editUsageSelection[label]

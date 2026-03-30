@@ -89,7 +89,7 @@ function loadCharacterUniformOverrides() {
   }
 }
 
-function getCharacterUniformOverride(slug) {
+export function getCharacterUniformOverride(slug) {
   const overrides = loadCharacterUniformOverrides();
   const value = overrides[slug];
   return Number.isInteger(value) && value >= -1 ? value : 0;
@@ -252,7 +252,15 @@ function CharacterIconFace({
   );
 }
 
-export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
+export function CharacterIcon({
+  name,
+  preferLatest = true,
+  language = 'ko',
+  uniformPreviewNumber = null,
+  uniformSelectionNumber = null,
+  onUniformSelect = null,
+  keepOpenOnSelect = false,
+}) {
   const entry = getCharacterEntry(name);
   const slug = entry?.slug || '';
   const buttonRef = useRef(null);
@@ -375,7 +383,21 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
     };
   }, [open]);
 
-  const selectedUniformNumber = Number.isInteger(uniformOverride) && uniformOverride >= -1 ? uniformOverride : 0;
+  const selectedUniformNumber = Number.isInteger(uniformSelectionNumber)
+    ? uniformSelectionNumber
+    : (Number.isInteger(uniformOverride) && uniformOverride >= -1 ? uniformOverride : 0);
+
+  const commitUniformSelection = (nextValue) => {
+    if (typeof onUniformSelect === 'function') {
+      onUniformSelect(nextValue);
+    } else {
+      setCharacterUniformOverride(slug, nextValue);
+    }
+
+    if (!keepOpenOnSelect) {
+      setOpen(false);
+    }
+  };
 
   const optionButtonClass = (active = false) =>
     `w-14 h-14 rounded-xl border cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
@@ -418,7 +440,11 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
           preferLatest={preferLatest}
           availableUniformNumbers={availableUniformNumbers}
           uniformNumbersRefreshing={loadingUniformNumbers}
-          uniformNumberOverride={selectedUniformNumber}
+          uniformNumberOverride={
+            Number.isInteger(uniformPreviewNumber) && uniformPreviewNumber > 0
+              ? uniformPreviewNumber
+              : selectedUniformNumber
+          }
           className="w-10 h-10"
           language={language}
         />
@@ -430,7 +456,7 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
       {open && createPortal(
         <div
           ref={menuRef}
-          className="z-[9999] rounded-2xl border bg-white shadow-2xl p-3 grid grid-cols-4 gap-2"
+          className="mff-uniform-menu z-[9999] rounded-2xl border bg-white shadow-2xl p-3 grid grid-cols-4 gap-2"
           style={
             menuStyle || {
               position: 'fixed',
@@ -441,11 +467,11 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
             }
           }
         >
-          <button
-            type="button"
-            onClick={async () => {
-              if (!slug) return;
-              setRefreshingUniformNumbers(true);
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!slug) return;
+                  setRefreshingUniformNumbers(true);
               clearUniformNumbersCache(slug);
               try {
                 const numbers = await refreshUniformNumbersCache(slug, 50);
@@ -463,8 +489,7 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
           <button
             type="button"
             onClick={() => {
-              setCharacterUniformOverride(slug, CHARACTER_UNIFORM_BASE);
-              setOpen(false);
+              commitUniformSelection(CHARACTER_UNIFORM_BASE);
             }}
             className={`${optionButtonClass(selectedUniformNumber === CHARACTER_UNIFORM_BASE)} col-span-1`}
             title={getUiText(language, 'base')}
@@ -483,8 +508,7 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
           <button
             type="button"
             onClick={() => {
-              setCharacterUniformOverride(slug, CHARACTER_UNIFORM_AUTO);
-              setOpen(false);
+              commitUniformSelection(CHARACTER_UNIFORM_AUTO);
             }}
             className={`${optionButtonClass(selectedUniformNumber === CHARACTER_UNIFORM_AUTO)} col-span-1`}
             title={getUiText(language, 'auto')}
@@ -505,8 +529,7 @@ export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
                 key={number}
                 type="button"
                 onClick={() => {
-                  setCharacterUniformOverride(slug, number);
-                  setOpen(false);
+                  commitUniformSelection(number);
                 }}
                 className={optionButtonClass(selectedUniformNumber === number)}
                 title={`Uniform ${number}`}
@@ -545,7 +568,7 @@ export function CharacterOriginBadge({ name, language = 'ko' }) {
   const style = styles[originType] || 'bg-slate-100 text-slate-700 border-slate-200';
 
   return (
-    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${style}`}>
+    <span className={`text-xs px-2 py-1 rounded-full border font-medium cursor-help ${style}`}>
       {translateValue(language, ORIGIN_LABELS, originType)}
     </span>
   );
@@ -568,7 +591,7 @@ export function CharacterAcquisitionBadge({ name, language = 'ko' }) {
   const style = styles[acquisitionType] || 'bg-slate-100 text-slate-700 border-slate-200';
 
   return (
-    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${style}`}>
+    <span className={`text-xs px-2 py-1 rounded-full border font-medium cursor-help ${style}`}>
       {translateValue(language, ACQUISITION_LABELS, acquisitionType)}
     </span>
   );
@@ -583,7 +606,7 @@ export function CTPBadge({ ctpType, className = 'w-11 h-11' }) {
   if (iconSrc) {
     return (
       <span
-        className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-white shrink-0 ${className} ${badgeStyle}`}
+        className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-white shrink-0 cursor-help ${className} ${badgeStyle}`}
         title={CTP_TYPE_DISPLAY_NAMES[ctpType] || `CTP ${ctpType}`}
       >
         <img src={iconSrc} alt={`CTP ${ctpType}`} className="w-full h-full object-contain p-0.5 scale-[1.02]" />
@@ -592,7 +615,7 @@ export function CTPBadge({ ctpType, className = 'w-11 h-11' }) {
   }
 
   return (
-    <span className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-slate-900 text-white shrink-0 ${className} ${badgeStyle}`}>
+    <span className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-slate-900 text-white shrink-0 cursor-help ${className} ${badgeStyle}`}>
       CTP
     </span>
   );
@@ -607,7 +630,7 @@ export function CharacterUsageBadge({ usageType, language = 'ko' }) {
   const normalized = usageType || '';
   if (!normalized) {
     return (
-      <span className="text-xs px-2 py-1 rounded-full border font-medium bg-slate-100 text-slate-500 border-slate-200">
+      <span className="text-xs px-2 py-1 rounded-full border font-medium bg-slate-100 text-slate-500 border-slate-200 cursor-help">
         {translateValue(language, USAGE_LABELS, 'None')}
       </span>
     );
@@ -619,7 +642,7 @@ export function CharacterUsageBadge({ usageType, language = 'ko' }) {
         {['PVE', 'PVP'].map((label) => (
           <span
             key={label}
-            className={`text-xs px-2 py-1 rounded-full border font-medium ${USAGE_BADGE_STYLES[label]}`}
+            className={`text-xs px-2 py-1 rounded-full border font-medium cursor-help ${USAGE_BADGE_STYLES[label]}`}
           >
             {label}
           </span>
@@ -631,7 +654,7 @@ export function CharacterUsageBadge({ usageType, language = 'ko' }) {
   const style = USAGE_BADGE_STYLES[normalized] || 'bg-slate-100 text-slate-700 border-slate-200';
 
   return (
-    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${style}`}>
+    <span className={`text-xs px-2 py-1 rounded-full border font-medium cursor-help ${style}`}>
       {translateValue(language, USAGE_LABELS, normalized === 'PVE' ? 'PVE only' : normalized === 'PVP' ? 'PVP only' : normalized)}
     </span>
   );
@@ -662,7 +685,7 @@ export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8', la
 
   return (
     <span
-      className={baseClass}
+      className={`${baseClass} cursor-help`}
       title={`${getUiText(language, 'priority')} ${label}`}
       aria-label={`${getUiText(language, 'priority')} ${label}`}
     >
@@ -674,7 +697,7 @@ export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8', la
 export function CTPPriorityBadge({ priority = 0, onClick, className = 'w-8 h-8', language = 'ko' }) {
   return (
     <div className="inline-flex flex-col items-center gap-0.5 shrink-0">
-      <span className="text-[9px] font-semibold leading-none text-slate-500">CTP</span>
+      <span className="text-[9px] font-semibold leading-none text-slate-500 cursor-help">CTP</span>
       <PriorityBadge
         priority={priority}
         onClick={onClick}
@@ -710,7 +733,7 @@ export function CharacterUpgradeBadges({ name, language = 'ko' }) {
         return (
           <span
             key={level}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg shrink-0 overflow-hidden ${styles[level] || 'bg-slate-200'}`}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg shrink-0 overflow-hidden cursor-help ${styles[level] || 'bg-slate-200'}`}
             title={translateValue(language, UPGRADE_LABELS, level)}
           >
             <img

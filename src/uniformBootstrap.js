@@ -1,6 +1,10 @@
 import { characterNames } from './characterData';
 import { getCharacterEntry } from './mffTrackerUtils';
-import { STATIC_ICON_URLS } from './iconAssets';
+import {
+  STATIC_ICON_URLS,
+  DEFAULT_ARTIFACT_PREVIEW_ICON,
+  getArtifactIconUrlBySlug,
+} from './iconAssets';
 import {
   UNIFORM_CACHE_VERSION,
   getBaseIconUrlBySlug,
@@ -52,6 +56,14 @@ export async function bootstrapUniformAssets(onProgress) {
       onProgress(loaded, total);
     }
   }
+
+  // Artifact assets load after the portrait cache and do not affect progress UI.
+  window.setTimeout(() => {
+    preloadImage(DEFAULT_ARTIFACT_PREVIEW_ICON);
+    for (const slug of slugs) {
+      preloadImage(getArtifactIconUrlBySlug(slug));
+    }
+  }, 0);
 
   if (typeof onProgress === 'function' && total === 0) {
     onProgress(0, 0);

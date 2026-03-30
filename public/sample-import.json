@@ -1,74 +1,99 @@
-[
-  {
-    "id": 1,
-    "character": "아이언맨",
-    "category": "성장 필요",
-    "detail": "3티→4티",
-    "done": false,
-    "priority": 3,
-    "usageType": "PVE"
-  },
-  {
-    "id": 2,
-    "character": "캡틴 마블",
-    "category": "유니폼 필요",
-    "detail": "한정",
-    "done": false,
-    "priority": 2,
-    "usageType": "PVE/PVP"
-  },
-  {
-    "id": 3,
-    "character": "루크 케이지",
-    "category": "성장 필요",
-    "detail": "2티→각초",
-    "done": true,
-    "priority": 1,
-    "usageType": "PVE/PVP"
-  },
-  {
-    "id": 4,
-    "character": "매들린 프라이어",
-    "category": "획득 필요",
-    "detail": "",
-    "done": false,
-    "priority": 2,
-    "usageType": "PVP"
-  },
-  {
-    "id": 5,
-    "character": "블루 드래곤",
-    "category": "획득 필요",
-    "detail": "",
-    "done": false,
-    "priority": 1,
-    "usageType": ""
-  },
-  {
-    "id": 6,
-    "character": "타노스",
-    "category": "성장 필요",
-    "detail": "3티→4티",
-    "done": false,
-    "priority": 3,
-    "usageType": "PVE/PVP"
-  },
-  {
-    "id": 7,
-    "character": "카니지",
-    "category": "유니폼 필요",
-    "detail": "상시 판매",
-    "done": true,
-    "priority": 3,
-    "usageType": "PVP"
-  },
-  {
-    "id": 8,
-    "character": "매직",
-    "category": "유니폼 필요",
-    "detail": "한정",
-    "done": false,
-    "priority": 2,
-    "usageType": "PVE"
+{
+  "version": 2,
+  "rows": [
+    {
+      "id": 1,
+      "character": "아이언맨",
+      "category": "성장 필요",
+      "detail": "3티→4티",
+      "done": false,
+      "priority": 3,
+      "usageType": "PVE"
+    },
+    {
+      "id": 2,
+      "character": "캡틴 마블",
+      "category": "유니폼 필요",
+      "detail": "한정",
+      "done": false,
+      "priority": 2,
+      "usageType": "PVE/PVP",
+      "uniformNumber": 5
+    },
+    {
+      "id": 3,
+      "character": "루크 케이지",
+      "category": "성장 필요",
+      "detail": "2티→각초",
+      "done": true,
+      "priority": 1,
+      "usageType": "PVE/PVP"
+    },
+    {
+      "id": 4,
+      "character": "매들린 프라이어",
+      "category": "획득 필요",
+      "detail": "",
+      "done": false,
+      "priority": 2,
+      "usageType": "PVP"
+    },
+    {
+      "id": 5,
+      "character": "블루 드래곤",
+      "category": "획득 필요",
+      "detail": "",
+      "done": false,
+      "priority": 1,
+      "usageType": ""
+    },
+    {
+      "id": 6,
+      "character": "타노스",
+      "category": "성장 필요",
+      "detail": "3티→4티",
+      "done": false,
+      "priority": 3,
+      "usageType": "PVE/PVP"
+    },
+    {
+      "id": 7,
+      "character": "카니지",
+      "category": "유니폼 필요",
+      "detail": "상시 판매",
+      "done": true,
+      "priority": 3,
+      "usageType": "PVP",
+      "uniformNumber": 2
+    },
+    {
+      "id": 8,
+      "character": "매직",
+      "category": "유니폼 필요",
+      "detail": "한정",
+      "done": false,
+      "priority": 2,
+      "usageType": "PVE"
+    }
+  ],
+  "characterOverrides": {
+    "ctp": {
+      "아이언맨": "파괴",
+      "타노스": "권능"
+    },
+    "ctpPriority": {
+      "아이언맨": 3,
+      "타노스": 2
+    },
+    "artifact": {
+      "아이언맨": {
+        "enabled": 1,
+        "star": 3
+      },
+      "캡틴 마블": {
+        "enabled": 1,
+        "star": 4
+      }
+    }
   }
-]
+}
