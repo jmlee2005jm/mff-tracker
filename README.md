@@ -10,8 +10,17 @@ Marvel Future Fight tracker for managing character tasks in a compact React UI.
 - Supports `Character View`, `Category View`, and `Character List`
 - Keeps rows separate from static character metadata
 - Saves data in `localStorage`
-- Supports JSON import and export 
+- Supports JSON import and export
 - Includes filters for name, origin, acquisition, tier, CTP, category, detail, usage, and priority
+
+## Sample Import
+
+A ready-to-import example is available at [`public/sample-import.json`](./public/sample-import.json). It includes rows that demonstrate:
+
+- `유니폼 필요`, `성장 필요`, and `획득 필요`
+- `PVE`, `PVP`, `PVE/PVP`, and no usage type
+- priority levels from `!` to `!!!`
+- completed and incomplete rows
 
 ## Features
 
