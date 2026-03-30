@@ -2,6 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CTP_TYPE_DISPLAY_NAMES, getCharacterEntry } from './mffTrackerUtils';
 import {
+  getUiText,
+  translateValue,
+  ORIGIN_LABELS,
+  ACQUISITION_LABELS,
+  UPGRADE_LABELS,
+  USAGE_LABELS,
+} from './i18n';
+import {
   getBaseIconUrlBySlug,
   getUniformIconUrlBySlug,
   findLatestUniformNumber,
@@ -173,6 +181,7 @@ function CharacterIconFace({
   className = 'w-10 h-10',
   uniformNumberOverride = 0,
   preferLatest = false,
+  language = 'ko',
 }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -252,7 +261,7 @@ function CharacterIconFace({
   if (!src || failed) {
     return (
       loading ? (
-        <LoadingIconTile className={className} label={`Loading ${name || 'character'}`} />
+        <LoadingIconTile className={className} label={`${getUiText(language, 'loading')} ${name || getUiText(language, 'character')}`} />
       ) : (
         <div className={`rounded-xl border bg-white flex items-center justify-center shrink-0 text-slate-900 border-slate-300 ${className}`}>
           <span className="text-sm font-bold">{name?.[0] || '?'}</span>
@@ -271,7 +280,7 @@ function CharacterIconFace({
   );
 }
 
-export function CharacterIcon({ name, preferLatest = false }) {
+export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
   const entry = getCharacterEntry(name);
   const slug = entry?.slug || '';
   const buttonRef = useRef(null);
@@ -400,11 +409,11 @@ export function CharacterIcon({ name, preferLatest = false }) {
   const triggerTitle = selectedUniformNumber > 0
     ? `Uniform ${selectedUniformNumber}`
     : selectedUniformNumber === CHARACTER_UNIFORM_BASE
-      ? 'Base portrait'
-    : 'Automatic newest uniform';
+      ? getUiText(language, 'base')
+    : getUiText(language, 'auto');
 
   if (!entry?.slug) {
-    return <CharacterIconFace name={name} className="w-10 h-10" preferLatest={preferLatest} />;
+    return <CharacterIconFace name={name} className="w-10 h-10" preferLatest={preferLatest} language={language} />;
   }
 
   return (
@@ -425,6 +434,7 @@ export function CharacterIcon({ name, preferLatest = false }) {
           preferLatest={preferLatest}
           uniformNumberOverride={selectedUniformNumber}
           className="w-10 h-10"
+          language={language}
         />
         <span className="absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full bg-sky-500 text-white text-[10px] leading-none flex items-center justify-center shadow-sm">
           ▾
@@ -452,14 +462,15 @@ export function CharacterIcon({ name, preferLatest = false }) {
               setOpen(false);
             }}
             className={`${optionButtonClass(selectedUniformNumber === CHARACTER_UNIFORM_BASE)} col-span-1`}
-            title="Base portrait"
+            title={getUiText(language, 'base')}
           >
             <CharacterIconFace
               name={name}
               uniformNumberOverride={CHARACTER_UNIFORM_BASE}
               className="w-8 h-8"
+              language={language}
             />
-            <span className="text-[10px] font-semibold text-slate-500">기본</span>
+            <span className="text-[10px] font-semibold text-slate-500">{getUiText(language, 'base')}</span>
           </button>
 
           <button
@@ -469,17 +480,17 @@ export function CharacterIcon({ name, preferLatest = false }) {
               setOpen(false);
             }}
             className={`${optionButtonClass(selectedUniformNumber === CHARACTER_UNIFORM_AUTO)} col-span-1`}
-            title="Automatic newest uniform"
+            title={getUiText(language, 'auto')}
           >
-            <span className="text-[10px] font-semibold text-slate-500">자동</span>
+            <span className="text-[10px] font-semibold text-slate-500">{getUiText(language, 'auto')}</span>
           </button>
 
           {loadingUniformNumbers && availableUniformNumbers.length === 0 ? (
             <>
-              <LoadingIconTile className="w-14 h-14" label="Loading uniform" />
-              <LoadingIconTile className="w-14 h-14" label="Loading uniform" />
-              <LoadingIconTile className="w-14 h-14" label="Loading uniform" />
-              <LoadingIconTile className="w-14 h-14" label="Loading uniform" />
+              <LoadingIconTile className="w-14 h-14" label={`${getUiText(language, 'loading')} ${getUiText(language, 'uniform')}`} />
+              <LoadingIconTile className="w-14 h-14" label={`${getUiText(language, 'loading')} ${getUiText(language, 'uniform')}`} />
+              <LoadingIconTile className="w-14 h-14" label={`${getUiText(language, 'loading')} ${getUiText(language, 'uniform')}`} />
+              <LoadingIconTile className="w-14 h-14" label={`${getUiText(language, 'loading')} ${getUiText(language, 'uniform')}`} />
             </>
           ) : (
             availableUniformNumbers.map((number) => (
@@ -497,6 +508,7 @@ export function CharacterIcon({ name, preferLatest = false }) {
                   name={name}
                   uniformNumberOverride={number}
                   className="w-10 h-10"
+                  language={language}
                 />
                 <span className="text-[9px] leading-none text-slate-500 font-semibold">#{number}</span>
               </button>
@@ -509,7 +521,7 @@ export function CharacterIcon({ name, preferLatest = false }) {
   );
 }
 
-export function CharacterOriginBadge({ name }) {
+export function CharacterOriginBadge({ name, language = 'ko' }) {
   const entry = getCharacterEntry(name);
   const originType = entry?.originType || null;
 
@@ -525,12 +537,12 @@ export function CharacterOriginBadge({ name }) {
 
   return (
     <span className={`text-xs px-2 py-1 rounded-full border font-medium ${style}`}>
-      {originType}
+      {translateValue(language, ORIGIN_LABELS, originType)}
     </span>
   );
 }
 
-export function CharacterAcquisitionBadge({ name }) {
+export function CharacterAcquisitionBadge({ name, language = 'ko' }) {
   const entry = getCharacterEntry(name);
   const acquisitionType = entry?.acquisitionType || null;
 
@@ -547,7 +559,7 @@ export function CharacterAcquisitionBadge({ name }) {
 
   return (
     <span className={`text-xs px-2 py-1 rounded-full border font-medium ${style}`}>
-      {acquisitionType}
+      {translateValue(language, ACQUISITION_LABELS, acquisitionType)}
     </span>
   );
 }
@@ -581,12 +593,12 @@ export function CharacterCTPBadge({ name }) {
   return <CTPBadge ctpType={entry?.ctp || null} />;
 }
 
-export function CharacterUsageBadge({ usageType }) {
+export function CharacterUsageBadge({ usageType, language = 'ko' }) {
   const normalized = usageType || '';
   if (!normalized) {
     return (
       <span className="text-xs px-2 py-1 rounded-full border font-medium bg-slate-100 text-slate-500 border-slate-200">
-        없음
+        {translateValue(language, USAGE_LABELS, 'None')}
       </span>
     );
   }
@@ -610,12 +622,12 @@ export function CharacterUsageBadge({ usageType }) {
 
   return (
     <span className={`text-xs px-2 py-1 rounded-full border font-medium ${style}`}>
-      {normalized}
+      {translateValue(language, USAGE_LABELS, normalized === 'PVE' ? 'PVE only' : normalized === 'PVP' ? 'PVP only' : normalized)}
     </span>
   );
 }
 
-export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8' }) {
+export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8', language = 'ko' }) {
   const normalized = Number.isInteger(priority) && priority >= 0 && priority <= 3 ? priority : 0;
   const label = normalized === 0 ? '0' : '!'.repeat(normalized);
   const style = PRIORITY_BADGE_STYLES[normalized] || PRIORITY_BADGE_STYLES[0];
@@ -630,8 +642,8 @@ export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8' }) 
             onClick(event);
           }}
           className={`${baseClass} cursor-pointer`}
-          title={`Priority ${label}`}
-          aria-label={`Priority ${label}`}
+          title={`${getUiText(language, 'priority')} ${label}`}
+          aria-label={`${getUiText(language, 'priority')} ${label}`}
         >
         {label}
       </button>
@@ -641,15 +653,15 @@ export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8' }) 
   return (
     <span
       className={baseClass}
-      title={`Priority ${label}`}
-      aria-label={`Priority ${label}`}
+      title={`${getUiText(language, 'priority')} ${label}`}
+      aria-label={`${getUiText(language, 'priority')} ${label}`}
     >
       {label}
     </span>
   );
 }
 
-export function CharacterUpgradeBadges({ name }) {
+export function CharacterUpgradeBadges({ name, language = 'ko' }) {
   const entry = getCharacterEntry(name);
   if (!entry?.upgradeLevel) return null;
 
@@ -675,7 +687,7 @@ export function CharacterUpgradeBadges({ name }) {
           <span
             key={level}
             className={`inline-flex items-center justify-center w-8 h-8 rounded-lg shrink-0 overflow-hidden ${styles[level] || 'bg-slate-200'}`}
-            title={level}
+            title={translateValue(language, UPGRADE_LABELS, level)}
           >
             <img
               src={src}

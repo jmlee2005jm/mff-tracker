@@ -6,6 +6,7 @@
 - The left control column stays sticky while scrolling on desktop and scrolls internally when needed
 - Users can switch between `Character View`, `Category View`, and `Character List`
 - Users can toggle between light and dark theme
+- Users can toggle between Korean and English, with Korean as the default language
 - Light theme keeps the default black borders and bright white surfaces
 - Dark theme uses gray surfaces, softened borders, and softened dark buttons instead of pure black/white contrast
 - The theme toggle is an emoji-style button that shows the current mode with a sun for light mode and a moon for dark mode, and the sun state uses a light yellow background
@@ -97,6 +98,7 @@
 ## Filters And Utilities
 
 - Search is split into a character name/alias field in the results header and structured metadata filters in the sidebar; origin, acquisition, tier, and category use multi-select chip filters, detail uses category-scoped pair chips, and CTP uses icon chips
+- Visible labels, badges, and helper text should follow the current UI language where the code supports it
 - The filters live in a left-edge drawer to keep the left column from feeling overloaded, and the floating `Filters` tab only appears when the drawer is closed
 - Name search matches the alias-aware character lookup rules, including English/slug queries
 - Character search dropdown supports Arrow Up/Down and Enter selection while it is open

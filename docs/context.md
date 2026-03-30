@@ -12,6 +12,7 @@ Marvel Future Fight tracker for managing per-character tasks in a single-page Re
 - Persist rows in `localStorage`
 - Support JSON import/export
 - Show a character icon, usage badge, origin badge where applicable, acquisition badge, and upgrade badges wherever a character is rendered
+- Support a Korean default UI with an English toggle
 
 ## Source Of Truth
 
@@ -19,6 +20,7 @@ Marvel Future Fight tracker for managing per-character tasks in a single-page Re
 - Task behavior and grouping helpers live in `src/mffTrackerUtils.js`
 - Main UI state and interactions live in `src/MFFTrackerUI.jsx`
 - Character icon, upgrade badge, acquisition badge, usage badge, and origin badge rendering live in `src/CharacterComponents.jsx`
+- Shared Korean/English label maps and text helpers live in `src/i18n.js`
 
 ## Character Metadata
 

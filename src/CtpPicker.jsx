@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CTPBadge } from './CharacterComponents';
+import { getUiText } from './i18n';
 import { CTP_TYPE_DISPLAY_NAMES, CTP_TYPE_OPTIONS } from './mffTrackerUtils';
 
 export default function CtpPicker({
@@ -9,6 +10,7 @@ export default function CtpPicker({
   label = '',
   compact = false,
   secretDisplay = false,
+  language = 'ko',
 }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef(null);
@@ -50,21 +52,21 @@ export default function CtpPicker({
   return (
     <div className="relative">
       <button
-        type="button"
-        ref={buttonRef}
-        onClick={() => setOpen((current) => !current)}
+      type="button"
+      ref={buttonRef}
+      onClick={() => setOpen((current) => !current)}
         className={`inline-flex items-center gap-1 text-slate-900 cursor-pointer whitespace-nowrap ${
           secretDisplay
             ? 'px-1 py-0.5 rounded-full bg-transparent shadow-none'
             : `px-3 rounded-xl border bg-white ${compact ? 'h-8' : 'h-11'}`
         }`}
-        title={label || (value || '-')}
-        aria-label={label || (value || '-')}
+        title={label || (value || getUiText(language, 'none'))}
+        aria-label={label || (value || getUiText(language, 'none'))}
       >
         {value ? (
           previewContent
         ) : (
-          <span className="text-[10px] font-semibold tracking-wide text-slate-500">CTP</span>
+          <span className="text-[10px] font-semibold tracking-wide text-slate-500">{getUiText(language, 'ctp')}</span>
         )}
         {!secretDisplay && <span className="text-[10px] leading-none text-slate-400">▾</span>}
       </button>

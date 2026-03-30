@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTP_ICON_BY_TYPE } from './CharacterComponents';
 import CtpPicker from './CtpPicker';
-import { getBaseIconUrlBySlug, getUniformIconUrlBySlug } from './iconUtils';
 import {
   CATEGORY_OPTIONS,
   ORIGIN_TYPE_OPTIONS,
@@ -26,6 +25,20 @@ import {
   cyclePriority,
   getCharacterDisplayName,
 } from './mffTrackerUtils';
+import {
+  APP_LANGUAGE_KEY,
+  CATEGORY_LABELS,
+  DETAIL_LABELS,
+  ORIGIN_LABELS,
+  ACQUISITION_LABELS,
+  UPGRADE_LABELS,
+  USAGE_LABELS,
+  CTP_LABELS,
+  LANGUAGE_TOGGLE_LABELS,
+  getUiText,
+  translateValue,
+  formatCountLabel,
+} from './i18n';
 import { characterNames } from './characterData';
 
 const STORAGE_KEY = 'mff_tracker_rows_v2';
@@ -261,6 +274,16 @@ export default function MFFTrackerUI() {
 
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
+  const [language, setLanguage] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem(APP_LANGUAGE_KEY);
+      if (saved === 'ko' || saved === 'en') return saved;
+    } catch {
+      // ignore storage errors
+    }
+
+    return 'ko';
+  });
   const [usageFilter, setUsageFilter] = useState(() => {
     try {
       const saved = window.localStorage.getItem(USAGE_FILTER_KEY);
@@ -448,8 +471,19 @@ export default function MFFTrackerUI() {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(APP_LANGUAGE_KEY, language);
+    } catch {
+      // ignore storage errors
+    }
+
+    document.documentElement.lang = language === 'en' ? 'en' : 'ko';
+  }, [language]);
   
   const sanityTests = useMemo(() => runSanityTests(), []);
+  const t = (key) => getUiText(language, key);
 
   const categories = useMemo(() => {
     return ['전체', ...Array.from(new Set(rows.map((row) => row.category)))];
@@ -548,28 +582,28 @@ export default function MFFTrackerUI() {
 
     if (nameQuery.trim()) {
       chips.push({
-        label: `Search: ${nameQuery.trim()}`,
+        label: `${t('search')}: ${nameQuery.trim()}`,
         clear: () => setNameQuery(''),
       });
     }
 
     selectedOrigins.forEach((origin) => {
       chips.push({
-        label: `Origin: ${origin}`,
+        label: `${t('origin')}: ${translateValue(language, ORIGIN_LABELS, origin)}`,
         clear: () => setSelectedOrigins((current) => current.filter((item) => item !== origin)),
       });
     });
 
     selectedAcquisitions.forEach((acquisition) => {
       chips.push({
-        label: `Acquisition: ${acquisition}`,
+        label: `${t('acquisition')}: ${translateValue(language, ACQUISITION_LABELS, acquisition)}`,
         clear: () => setSelectedAcquisitions((current) => current.filter((item) => item !== acquisition)),
       });
     });
 
     selectedUpgrades.forEach((upgrade) => {
       chips.push({
-        label: `Tier: ${upgrade}`,
+        label: `${t('tier')}: ${translateValue(language, UPGRADE_LABELS, upgrade)}`,
         clear: () => setSelectedUpgrades((current) => current.filter((item) => item !== upgrade)),
       });
     });
@@ -577,19 +611,19 @@ export default function MFFTrackerUI() {
     const usageLabel = getUsageSelectionLabel(usageFilter);
     if (usageLabel !== 'All') {
       chips.push({
-        label: `Usage: ${usageLabel}`,
+        label: `${t('usage')}: ${translateValue(language, USAGE_LABELS, usageLabel)}`,
         clear: () => setUsageFilter(normalizeUsageSelection({ PVE: true, PVP: true })),
       });
     }
 
     chips.push({
-      label: `Priority: ${'!'.repeat(minimumPriorityFilter)}`,
+      label: `${t('priority')}: ${'!'.repeat(minimumPriorityFilter)}`,
       clear: () => setMinimumPriorityFilter(1),
     });
 
     selectedCtps.forEach((ctp) => {
       chips.push({
-        label: `CTP: ${ctp}`,
+        label: `${t('ctp')}: ${translateValue(language, CTP_LABELS, ctp)}`,
         clear: () => setSelectedCtps((current) => current.filter((item) => item !== ctp)),
         icon: CTP_ICON_BY_TYPE[ctp] || '',
         title: ctp,
@@ -598,7 +632,7 @@ export default function MFFTrackerUI() {
 
     selectedCategories.forEach((category) => {
       chips.push({
-        label: `Category: ${category}`,
+        label: `${t('category')}: ${translateValue(language, CATEGORY_LABELS, category)}`,
         clear: () => setSelectedCategories((current) => current.filter((item) => item !== category)),
       });
     });
@@ -606,7 +640,7 @@ export default function MFFTrackerUI() {
     selectedDetails.forEach((detailKey) => {
       const [category, detail] = detailKey.split('__');
       chips.push({
-        label: `Detail: ${category} / ${detail}`,
+        label: `${t('detail')}: ${translateValue(language, CATEGORY_LABELS, category)} / ${translateValue(language, DETAIL_LABELS, detail)}`,
         clear: () => setSelectedDetails((current) => current.filter((item) => item !== detailKey)),
       });
     });
@@ -688,15 +722,15 @@ export default function MFFTrackerUI() {
     };
 
     if (!character) {
-      newErrors.character = 'This field is required';
+      newErrors.character = t('requiredField');
     } else if (!getCharacterEntry(character)) {
-      newErrors.character = 'Invalid character name';
+      newErrors.character = t('invalidCharacterName');
     }
 
     if (category === '성장 필요' && availableDetailOptions.length === 0) {
-      newErrors.detail = 'This character has no growth options';
+      newErrors.detail = t('noGrowthOptions');
     } else if (category !== '획득 필요' && !isDetailValidForCategory(category, character, detail)) {
-      newErrors.detail = 'This field is required';
+      newErrors.detail = t('requiredField');
     }
 
     const normalizedDetail = category === '획득 필요' ? '' : detail;
@@ -707,7 +741,7 @@ export default function MFFTrackerUI() {
     );
 
     if (isDuplicate) {
-      newErrors.general = 'This entry already exists';
+      newErrors.general = t('duplicateEntry');
     }
 
     if (newErrors.character || newErrors.detail || newErrors.general) {
@@ -732,7 +766,7 @@ export default function MFFTrackerUI() {
       },
     ]);
 
-    setSuccessMessage('Entry added successfully!');
+    setSuccessMessage(t('entryAdded'));
 
     setForm((prev) => {
       const nextOptions = DETAIL_OPTIONS[prev.category] || [];
@@ -773,9 +807,9 @@ export default function MFFTrackerUI() {
     };
 
     if (editingRow.category === '성장 필요' && editingAvailableDetailOptions.length === 0) {
-      newErrors.detail = 'This character has no growth options';
+      newErrors.detail = t('noGrowthOptions');
     } else if (editingRow.category !== '획득 필요' && !isDetailValidForCategory(editingRow.category, editingRow.character, nextDetail)) {
-      newErrors.detail = 'This field is required';
+      newErrors.detail = t('requiredField');
     }
 
     const normalizedDetail = editingRow.category === '획득 필요' ? '' : nextDetail;
@@ -787,7 +821,7 @@ export default function MFFTrackerUI() {
     );
 
     if (isDuplicate) {
-      newErrors.general = 'This entry already exists';
+      newErrors.general = t('duplicateEntry');
     }
 
     if (newErrors.detail || newErrors.general) {
@@ -809,7 +843,7 @@ export default function MFFTrackerUI() {
       )
     );
 
-    setSuccessMessage('Entry updated successfully!');
+    setSuccessMessage(t('entryUpdated'));
     closeEditRow();
   }
 
@@ -894,12 +928,12 @@ export default function MFFTrackerUI() {
         const parsed = JSON.parse(text);
 
         if (!Array.isArray(parsed)) {
-          window.alert('Invalid JSON: expected an array of rows.');
+          window.alert(t('jsonExpectedArray'));
           return;
         }
 
         if (parsed.length > 5000) {
-          window.alert('Invalid JSON: too many rows.');
+          window.alert(t('jsonTooManyRows'));
           return;
         }
 
@@ -917,14 +951,14 @@ export default function MFFTrackerUI() {
         });
 
         if (!isValid) {
-          window.alert('Invalid JSON format.');
+          window.alert(t('jsonInvalidFormat'));
           return;
         }
 
         setRows(parsed.map(normalizeImportedRow).filter(Boolean));
         setShowResetConfirm(false);
       } catch {
-        window.alert('Failed to import JSON.');
+        window.alert(t('jsonFailed'));
       } finally {
         event.target.value = '';
       }
@@ -947,9 +981,9 @@ export default function MFFTrackerUI() {
           <div className="bg-white rounded-3xl shadow-sm border p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Marvel Future Fight Tracker</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
               <p className="text-sm text-slate-600 mt-1">
-                캐릭터별 성장/유니폼/획득 메모를 깔끔하게 관리하는 UI
+                {t('subtitle')}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -961,26 +995,37 @@ export default function MFFTrackerUI() {
                 className={`w-11 h-11 rounded-2xl border flex items-center justify-center text-lg ${
                   theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-yellow-100 text-slate-900'
                 }`}
+                >
+                  <span aria-hidden="true">{theme === 'dark' ? '🌙' : '☀️'}</span>
+                </button>
+              <button
+                type="button"
+                onClick={() => setLanguage((current) => (current === 'ko' ? 'en' : 'ko'))}
+                className={`w-11 h-11 rounded-2xl border flex items-center justify-center text-sm font-semibold ${
+                  theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'
+                }`}
+                title={language === 'ko' ? 'English' : '한국어'}
+                aria-label={language === 'ko' ? 'Switch to English' : 'Switch to Korean'}
               >
-                <span aria-hidden="true">{theme === 'dark' ? '🌙' : '☀️'}</span>
+                {LANGUAGE_TOGGLE_LABELS[language]}
               </button>
               <button
                 onClick={() => setView('character')}
                 className={`px-4 py-2 rounded-2xl border ${view === 'character' ? 'bg-slate-900 text-white' : 'bg-white'}`}
               >
-                Character View
+                {t('characterView')}
               </button>
               <button
                 onClick={() => setView('category')}
                 className={`px-4 py-2 rounded-2xl border ${view === 'category' ? 'bg-slate-900 text-white' : 'bg-white'}`}
               >
-                Category View
+                {t('categoryView')}
               </button>
               <button
                 onClick={() => setView('roster')}
                 className={`px-4 py-2 rounded-2xl border ${view === 'roster' ? 'bg-slate-900 text-white' : 'bg-white'}`}
               >
-                Character List
+                {t('characterList')}
               </button>
             </div>
           </div>
@@ -997,7 +1042,7 @@ export default function MFFTrackerUI() {
               : 'pointer-events-auto opacity-100 translate-x-0'
           }`}
         >
-          Filters
+          {t('filters')}
         </button>
 
         <div
@@ -1008,26 +1053,26 @@ export default function MFFTrackerUI() {
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold">Filters</h2>
+            <h2 className="text-xl font-semibold">{t('filters')}</h2>
             <button
               type="button"
               onClick={() => setShowFiltersDrawer(false)}
               className="text-sm px-3 py-1.5 rounded-full border bg-slate-100 text-slate-700"
             >
-              Close
+              {t('close')}
             </button>
           </div>
 
           <div className="space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-slate-500">Origin</label>
+                <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-medium text-slate-500">{t('origin')}</label>
                 <button
                   type="button"
                   onClick={() => setSelectedOrigins([])}
                   className="text-xs text-slate-500 hover:text-slate-800"
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1044,7 +1089,7 @@ export default function MFFTrackerUI() {
                           : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}
                     >
-                      {option}
+                      {translateValue(language, ORIGIN_LABELS, option)}
                     </button>
                   );
                 })}
@@ -1053,13 +1098,13 @@ export default function MFFTrackerUI() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-slate-500">Acquisition</label>
+                <label className="text-xs font-medium text-slate-500">{t('acquisition')}</label>
                 <button
                   type="button"
                   onClick={() => setSelectedAcquisitions([])}
                   className="text-xs text-slate-500 hover:text-slate-800"
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1076,7 +1121,7 @@ export default function MFFTrackerUI() {
                           : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}
                     >
-                      {option}
+                      {translateValue(language, ACQUISITION_LABELS, option)}
                     </button>
                   );
                 })}
@@ -1085,13 +1130,13 @@ export default function MFFTrackerUI() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-slate-500">Tier</label>
+                <label className="text-xs font-medium text-slate-500">{t('tier')}</label>
                 <button
                   type="button"
                   onClick={() => setSelectedUpgrades([])}
                   className="text-xs text-slate-500 hover:text-slate-800"
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1108,7 +1153,7 @@ export default function MFFTrackerUI() {
                           : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}
                     >
-                      {option}
+                      {translateValue(language, UPGRADE_LABELS, option)}
                     </button>
                   );
                 })}
@@ -1117,13 +1162,13 @@ export default function MFFTrackerUI() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-slate-500">CTP</label>
+                <label className="text-xs font-medium text-slate-500">{t('ctp')}</label>
                 <button
                   type="button"
                   onClick={() => setSelectedCtps([])}
                   className="text-xs text-slate-500 hover:text-slate-800"
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               </div>
               <div className="grid grid-cols-5 gap-2">
@@ -1155,13 +1200,13 @@ export default function MFFTrackerUI() {
             <div className="space-y-3">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-medium text-slate-500">Category</label>
+                <label className="text-xs font-medium text-slate-500">{t('category')}</label>
                   <button
                     type="button"
                     onClick={() => setSelectedCategories([])}
                     className="text-xs text-slate-500 hover:text-slate-800"
                   >
-                    Clear
+                    {t('clear')}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1182,7 +1227,7 @@ export default function MFFTrackerUI() {
                               : 'bg-slate-100 text-slate-600 border-slate-200'
                           }`}
                         >
-                          {category}
+                          {translateValue(language, CATEGORY_LABELS, category)}
                         </button>
                       );
                     })}
@@ -1191,13 +1236,13 @@ export default function MFFTrackerUI() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-medium text-slate-500">Detail</label>
+                  <label className="text-xs font-medium text-slate-500">{t('detail')}</label>
                   <button
                     type="button"
                     onClick={() => setSelectedDetails([])}
                     className="text-xs text-slate-500 hover:text-slate-800"
                   >
-                    Clear
+                    {t('clear')}
                   </button>
                 </div>
                 <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
@@ -1206,7 +1251,9 @@ export default function MFFTrackerUI() {
                     : detailOptionsByCategory
                   ).map((group) => (
                     <div key={group.category} className="space-y-2">
-                      <div className="text-xs font-medium text-slate-500">{group.category}</div>
+                      <div className="text-xs font-medium text-slate-500">
+                        {translateValue(language, CATEGORY_LABELS, group.category)}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {group.details.map((detail) => {
                           const key = makeDetailKey(group.category, detail);
@@ -1224,7 +1271,7 @@ export default function MFFTrackerUI() {
                                   : 'bg-slate-100 text-slate-600 border-slate-200'
                               }`}
                             >
-                              {detail}
+                              {translateValue(language, DETAIL_LABELS, detail)}
                             </button>
                           );
                         })}
@@ -1241,7 +1288,7 @@ export default function MFFTrackerUI() {
           <div className="lg:col-span-1 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto bg-white rounded-3xl shadow-sm border p-5 h-fit space-y-6">
             <div>
               <div className="flex items-center justify-between gap-3 mb-4">
-                <h2 className="text-xl font-semibold">Add Entry</h2>
+                <h2 className="text-xl font-semibold">{t('addEntry')}</h2>
                 <div className="flex items-center gap-2">
                   {['PVE', 'PVP'].map((label) => (
                     <button
@@ -1270,7 +1317,7 @@ export default function MFFTrackerUI() {
               </div>
               <form onSubmit={addRow} className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium">Character</label>
+                  <label className="text-sm font-medium">{t('character')}</label>
                   <div className="relative flex items-center">
                     <input
                       value={form.character}
@@ -1327,14 +1374,14 @@ export default function MFFTrackerUI() {
                         // Delay to allow click on options
                         setTimeout(() => setShowCharacterDropdown(false), 150);
                       }}
-                      placeholder="Type to search characters..."
+                      placeholder={t('search')}
                       className={`flex-1 mt-1 px-3 py-2 rounded-2xl border ${
                         errors.character ? 'border-red-500' : ''
                       }`}
                     />
                     {form.character && selectedCharacterEntry && (
                       <div className="ml-2 mt-1 flex items-center gap-2">
-                        <CharacterIcon name={form.character} preferLatest />
+                        <CharacterIcon name={form.character} preferLatest language={language} />
                         <span
                           className={`text-xs px-2 py-1 rounded-full border font-medium whitespace-nowrap ${
                             selectedCharacterRowCount > 0
@@ -1343,13 +1390,13 @@ export default function MFFTrackerUI() {
                           }`}
                           title={
                             selectedCharacterRowCount > 0
-                              ? `${selectedCharacterRowCount} entries already exist`
-                              : 'No entries yet'
+                            ? formatCountLabel(language, selectedCharacterRowCount)
+                              : t('noEntries')
                           }
                         >
                           {selectedCharacterRowCount > 0
-                            ? `${selectedCharacterRowCount} in table`
-                            : 'New'}
+                            ? formatCountLabel(language, selectedCharacterRowCount)
+                            : t('new')}
                         </span>
                       </div>
                     )}
@@ -1370,7 +1417,7 @@ export default function MFFTrackerUI() {
                                 : 'hover:bg-gray-100'
                             }`}
                           >
-                            <CharacterIcon name={name} preferLatest />
+                            <CharacterIcon name={name} preferLatest language={language} />
                             <span>{name}</span>
                           </div>
                         ))}
@@ -1382,7 +1429,7 @@ export default function MFFTrackerUI() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Category</label>
+                  <label className="text-sm font-medium">{t('category')}</label>
                   <select
                     value={form.category}
                     onChange={(event) => {
@@ -1399,14 +1446,14 @@ export default function MFFTrackerUI() {
                   >
                     {CATEGORY_OPTIONS.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {translateValue(language, CATEGORY_LABELS, option)}
                       </option>
                     ))}
                   </select>
                 </div>
               {form.category !== '획득 필요' && (
                 <div>
-                    <label className="text-sm font-medium">Detail</label>
+                    <label className="text-sm font-medium">{t('detail')}</label>
                       <select
                       value={formDetailValue}
                       disabled={availableDetailOptions.length === 0}
@@ -1423,7 +1470,7 @@ export default function MFFTrackerUI() {
                       {availableDetailOptions.length > 0 ? (
                         availableDetailOptions.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {translateValue(language, DETAIL_LABELS, option)}
                           </option>
                         ))
                       ) : (
@@ -1439,7 +1486,7 @@ export default function MFFTrackerUI() {
                   </div>
                 )}
                 <button className="mff-add-button w-full px-4 py-2 rounded-2xl font-medium cursor-pointer">
-                  Add
+                  {t('addEntry')}
                 </button>
               </form>
 
@@ -1462,23 +1509,23 @@ export default function MFFTrackerUI() {
                   checked={showDone}
                   onChange={(event) => setShowDone(event.target.checked)}
                 />
-                Show completed entries
+                {t('showCompletedEntries')}
               </label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => importFileRef.current?.click()}
-                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer"
+                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer whitespace-pre-line text-center"
                 >
-                  Import JSON
+                  {t('importJson')}
                 </button>
 
                 <button
                   type="button"
                   onClick={exportJson}
-                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer"
+                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer whitespace-pre-line text-center"
                 >
-                  Export JSON
+                  {t('exportJson')}
                 </button>
 
                 <button
@@ -1494,20 +1541,20 @@ export default function MFFTrackerUI() {
                     showResetConfirm ? 'border-red-300 bg-red-50 text-red-700' : ''
                   }`}
                 >
-                  {showResetConfirm ? 'Are you sure?' : 'Reset'}
+                  {showResetConfirm ? t('resetConfirm') : t('reset')}
                 </button>
               </div>
             </div>
 
             <div className="pt-6 border-t space-y-2">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Sanity Tests</h2>
+                <h2 className="text-xl font-semibold">{t('sanityTests')}</h2>
                 <button
                   type="button"
                   onClick={() => setShowSanityTests((current) => !current)}
                   className="px-3 py-1 rounded-xl border text-sm"
                 >
-                  {showSanityTests ? 'Hide' : 'Show'}
+                  {showSanityTests ? t('hide') : t('show')}
                 </button>
               </div>
               {showSanityTests && (
@@ -1521,7 +1568,7 @@ export default function MFFTrackerUI() {
                         key={test.name}
                         className={`rounded-2xl border px-3 py-2 text-sm ${test.pass ? 'bg-green-50' : 'bg-red-50'}`}
                       >
-                        <span className="font-medium">{test.pass ? 'PASS' : 'FAIL'}</span> — {test.name}
+                        <span className="font-medium">{test.pass ? t('pass') : t('fail')}</span> — {test.name}
                       </div>
                     ))}
                   </div>
@@ -1535,21 +1582,22 @@ export default function MFFTrackerUI() {
               <div className="flex items-center gap-3 min-w-0 flex-nowrap">
                 <h2 className="text-xl font-semibold whitespace-nowrap">
                   {view === 'character'
-                    ? 'Grouped by Character'
+                    ? t('groupedByCharacter')
                     : view === 'category'
-                      ? 'Grouped by Category'
-                      : 'Character List'}
+                      ? t('groupedByCategory')
+                      : t('characterList')}
                 </h2>
                 <PriorityBadge
                   priority={minimumPriorityFilter}
                   onClick={() => setMinimumPriorityFilter((current) => cyclePriority(current))}
                   className="w-9 h-9"
+                  language={language}
                 />
                 <div className="relative w-36 max-w-[20vw] shrink-0">
                   <input
                     value={nameQuery}
                     onChange={(event) => setNameQuery(event.target.value)}
-                    placeholder="Search"
+                    placeholder={t('search')}
                     className="w-full pl-10 pr-3 py-2 rounded-2xl border"
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
@@ -1561,65 +1609,65 @@ export default function MFFTrackerUI() {
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <span className="text-xs px-2 py-1 rounded-full bg-slate-100">
-                  {getUsageSelectionLabel(usageFilter)}
+                  {translateValue(language, USAGE_LABELS, getUsageSelectionLabel(usageFilter))}
                 </span>
                 {view === 'character' && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500 whitespace-nowrap">Sort by</span>
+                    <span className="text-sm text-slate-500 whitespace-nowrap">{t('sortBy')}</span>
                     <select
                       value={characterSort}
                       onChange={(e) => setCharacterSort(e.target.value)}
                       className="px-3 py-1 rounded-xl border text-sm"
                     >
-                      <option value="name">Name</option>
-                      <option value="origin">Origin</option>
-                      <option value="acquisition">Acquisition</option>
-                      <option value="tier">Tier</option>
-                      <option value="lastAdded">Last Added</option>
-                      <option value="priority">Priority</option>
-                      <option value="completion">Completion</option>
-                      <option value="tasks">Task Count</option>
+                      <option value="name">{t('name')}</option>
+                      <option value="origin">{t('origin')}</option>
+                      <option value="acquisition">{t('acquisition')}</option>
+                      <option value="tier">{t('tier')}</option>
+                      <option value="lastAdded">{t('lastAdded')}</option>
+                      <option value="priority">{t('priority')}</option>
+                      <option value="completion">{t('completion')}</option>
+                      <option value="tasks">{t('taskCount')}</option>
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => setCharacterSortDirection((current) => (current === 'desc' ? 'asc' : 'desc'))}
-                      className="w-9 h-9 rounded-xl border flex items-center justify-center text-sm"
-                      title={characterSortDirection === 'desc' ? 'Descending' : 'Ascending'}
-                      aria-label={characterSortDirection === 'desc' ? 'Descending' : 'Ascending'}
-                    >
-                      <span aria-hidden="true">{characterSortDirection === 'desc' ? '↓' : '↑'}</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setCharacterSortDirection((current) => (current === 'desc' ? 'asc' : 'desc'))}
+                        className="w-9 h-9 rounded-xl border flex items-center justify-center text-sm"
+                        title={characterSortDirection === 'desc' ? t('descending') : t('ascending')}
+                        aria-label={characterSortDirection === 'desc' ? t('descending') : t('ascending')}
+                      >
+                        <span aria-hidden="true">{characterSortDirection === 'desc' ? '↓' : '↑'}</span>
+                      </button>
                   </div>
                 )}
                 {view === 'roster' && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500 whitespace-nowrap">Sort by</span>
+                    <span className="text-sm text-slate-500 whitespace-nowrap">{t('sortBy')}</span>
                     <select
                       value={rosterSort}
                       onChange={(e) => setRosterSort(e.target.value)}
                       className="px-3 py-1 rounded-xl border text-sm"
                     >
-                      <option value="name">Name</option>
-                      <option value="origin">Origin</option>
-                      <option value="acquisition">Acquisition</option>
-                      <option value="tier">Tier</option>
-                      <option value="lastAdded">Last Added</option>
-                      <option value="priority">Priority</option>
-                      <option value="completion">Completion</option>
-                      <option value="tasks">Task Count</option>
+                      <option value="name">{t('name')}</option>
+                      <option value="origin">{t('origin')}</option>
+                      <option value="acquisition">{t('acquisition')}</option>
+                      <option value="tier">{t('tier')}</option>
+                      <option value="lastAdded">{t('lastAdded')}</option>
+                      <option value="priority">{t('priority')}</option>
+                      <option value="completion">{t('completion')}</option>
+                      <option value="tasks">{t('taskCount')}</option>
                     </select>
                     <button
                       type="button"
                       onClick={() => setRosterSortDirection((current) => (current === 'desc' ? 'asc' : 'desc'))}
                       className="w-9 h-9 rounded-xl border flex items-center justify-center text-sm"
-                      title={rosterSortDirection === 'desc' ? 'Descending' : 'Ascending'}
-                      aria-label={rosterSortDirection === 'desc' ? 'Descending' : 'Ascending'}
+                      title={rosterSortDirection === 'desc' ? t('descending') : t('ascending')}
+                      aria-label={rosterSortDirection === 'desc' ? t('descending') : t('ascending')}
                     >
                       <span aria-hidden="true">{rosterSortDirection === 'desc' ? '↓' : '↑'}</span>
                     </button>
                   </div>
                 )}
-                <div className="text-sm text-slate-500">{priorityFilteredRows.length} entries</div>
+                <div className="text-sm text-slate-500">{formatCountLabel(language, priorityFilteredRows.length)}</div>
               </div>
             </div>
 
@@ -1645,10 +1693,10 @@ export default function MFFTrackerUI() {
                   <div className="rounded-3xl border p-6 flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-3">
-                        <CharacterIcon name={quickAddCharacter} preferLatest />
+                        <CharacterIcon name={quickAddCharacter} preferLatest language={language} />
                         <div className="text-lg font-semibold truncate">{quickAddCharacter}</div>
                       </div>
-                      <p className="text-sm text-slate-600 mt-1">No tracked entries yet for this character.</p>
+                      <p className="text-sm text-slate-600 mt-1">{t('noTrackedEntries')}</p>
                     </div>
                     <button
                       type="button"
@@ -1661,14 +1709,14 @@ export default function MFFTrackerUI() {
                       }}
                       className="px-4 py-2 rounded-2xl border bg-slate-900 text-white cursor-pointer"
                     >
-                      Quick add
+                      {t('quickAdd')}
                     </button>
                   </div>
                 )}
                 {!displayedGroupedByCharacter.length && (!quickAddCharacter || hasTrackedEntryForQuickAddCharacter) && (
-                  <div className="rounded-3xl border p-6 text-sm text-slate-600">
-                    No entries match this search.
-                  </div>
+                      <div className="rounded-3xl border p-6 text-sm text-slate-600">
+                        {t('noEntries')}
+                      </div>
                 )}
                 {displayedGroupedByCharacter.map(([character, items]) => {
                   const characterCtp = getCharacterCtp(character);
@@ -1677,12 +1725,12 @@ export default function MFFTrackerUI() {
                     <div key={character} className="rounded-3xl border p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <CharacterIcon name={character} theme={theme} />
+                          <CharacterIcon name={character} theme={theme} language={language} />
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-lg font-semibold">{character}</h3>
-                            <CharacterUpgradeBadges name={character} />
-                            <CharacterAcquisitionBadge name={character} />
-                            <CharacterOriginBadge name={character} />
+                            <CharacterUpgradeBadges name={character} language={language} />
+                            <CharacterAcquisitionBadge name={character} language={language} />
+                            <CharacterOriginBadge name={character} language={language} />
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1692,9 +1740,10 @@ export default function MFFTrackerUI() {
                             align="right"
                             label={characterCtp || '-'}
                             secretDisplay
+                            language={language}
                           />
-                          <PriorityBadge priority={getGroupPriority(items)} className="w-8 h-8" />
-                          <span className="text-xs px-2 py-1 rounded-full bg-slate-100">{items.length} items</span>
+                          <PriorityBadge priority={getGroupPriority(items)} className="w-8 h-8" language={language} />
+                          <span className="text-xs px-2 py-1 rounded-full bg-slate-100">{formatCountLabel(language, items.length)}</span>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -1715,30 +1764,31 @@ export default function MFFTrackerUI() {
                             </button>
                             <div className="flex-1 min-w-0">
                               <div className={`font-medium ${item.done ? 'line-through text-slate-400' : ''}`}>
-                                {item.category}
+                                {translateValue(language, CATEGORY_LABELS, item.category)}
                               </div>
                               <div className={`text-sm text-slate-600 ${item.done ? 'line-through text-slate-400' : ''}`}>
-                                {item.detail}
+                                {translateValue(language, DETAIL_LABELS, item.detail)}
                               </div>
                             </div>
                             <PriorityBadge
                               priority={item.priority}
                               onClick={() => cycleRowPriority(item.id)}
+                              language={language}
                             />
-                            <CharacterUsageBadge usageType={item.usageType} />
+                            <CharacterUsageBadge usageType={item.usageType} language={language} />
                             <button
                               type="button"
                               onClick={() => openEditRow(item)}
                               className="text-sm px-3 py-1 rounded-xl border cursor-pointer"
                             >
-                              Edit
+                              {t('editEntry')}
                             </button>
                             <button
                               type="button"
                               onClick={() => removeRow(item.id)}
                               className="text-sm px-3 py-1 rounded-xl border cursor-pointer"
                             >
-                              Delete
+                              {t('delete')}
                             </button>
                           </div>
                         ))}
@@ -1756,10 +1806,10 @@ export default function MFFTrackerUI() {
                     <div key={character} className="rounded-3xl border p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <CharacterIcon name={character} theme={theme} />
+                          <CharacterIcon name={character} theme={theme} language={language} />
                           <div className="min-w-0">
                             <div className="font-semibold truncate">{character}</div>
-                            <div className="text-xs text-slate-500">{items.length} items</div>
+                            <div className="text-xs text-slate-500">{formatCountLabel(language, items.length)}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -1769,14 +1819,15 @@ export default function MFFTrackerUI() {
                             align="right"
                             label={characterCtp || '-'}
                             secretDisplay
+                            language={language}
                           />
-                          <PriorityBadge priority={getGroupPriority(items)} className="w-8 h-8" />
+                          <PriorityBadge priority={getGroupPriority(items)} className="w-8 h-8" language={language} />
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CharacterUpgradeBadges name={character} />
-                        <CharacterAcquisitionBadge name={character} />
-                        <CharacterOriginBadge name={character} />
+                        <CharacterUpgradeBadges name={character} language={language} />
+                        <CharacterAcquisitionBadge name={character} language={language} />
+                        <CharacterOriginBadge name={character} language={language} />
                       </div>
                     </div>
                   );
@@ -1831,10 +1882,10 @@ export default function MFFTrackerUI() {
                       setDraggingRowId(null);
                       setDragTargetGroupKey('');
                     }}
-                  >
+                    >
                     <div className="mb-3">
-                      <h3 className="text-lg font-semibold">{group.category}</h3>
-                      <p className="text-sm text-slate-600">{group.detail}</p>
+                      <h3 className="text-lg font-semibold">{translateValue(language, CATEGORY_LABELS, group.category)}</h3>
+                      <p className="text-sm text-slate-600">{translateValue(language, DETAIL_LABELS, group.detail)}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {group.items
@@ -1890,17 +1941,18 @@ export default function MFFTrackerUI() {
                               item.done ? 'bg-slate-50 border-slate-200' : 'bg-white'
                             }`}
                           >
-                            <CharacterIcon name={item.character} theme={theme} />
+                            <CharacterIcon name={item.character} theme={theme} language={language} />
                             <span className={`max-w-36 truncate text-sm font-medium ${item.done ? 'line-through text-slate-400' : ''}`}>
                               {getCharacterDisplayName(item.character)}
                             </span>
-                            <CharacterAcquisitionBadge name={item.character} />
-                            <CharacterOriginBadge name={item.character} />
+                            <CharacterAcquisitionBadge name={item.character} language={language} />
+                            <CharacterOriginBadge name={item.character} language={language} />
                             <PriorityBadge
                               priority={item.priority}
                               onClick={() => cycleRowPriority(item.id)}
+                              language={language}
                             />
-                            <CharacterUsageBadge usageType={item.usageType} />
+                            <CharacterUsageBadge usageType={item.usageType} language={language} />
                           </div>
                         ))}
                     </div>
@@ -1918,7 +1970,7 @@ export default function MFFTrackerUI() {
             <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border p-6">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold">Edit Entry</h3>
+                  <h3 className="text-xl font-semibold">{t('editEntry')}</h3>
                   <p className="text-sm text-slate-500 mt-1">{editingRow.character}</p>
                 </div>
                 <button
@@ -1926,18 +1978,18 @@ export default function MFFTrackerUI() {
                   onClick={closeEditRow}
                   className="px-3 py-1 rounded-xl border text-sm"
                 >
-                  Close
+                  {t('close')}
                 </button>
               </div>
 
               <form onSubmit={saveEditRow} className="space-y-4">
                 <div className="text-sm">
-                  <div className="font-medium">Category</div>
-                  <div className="mt-1 text-slate-600">{editingRow.category}</div>
+                  <div className="font-medium">{t('category')}</div>
+                  <div className="mt-1 text-slate-600">{translateValue(language, CATEGORY_LABELS, editingRow.category)}</div>
                 </div>
 
                 <div className="text-sm">
-                  <div className="font-medium">Detail</div>
+                  <div className="font-medium">{t('detail')}</div>
                   <select
                     value={editingDetailValue}
                     disabled={editingAvailableDetailOptions.length === 0}
@@ -1952,7 +2004,7 @@ export default function MFFTrackerUI() {
                     {editingAvailableDetailOptions.length > 0 ? (
                       editingAvailableDetailOptions.map((option) => (
                         <option key={option} value={option}>
-                          {option}
+                          {translateValue(language, DETAIL_LABELS, option)}
                         </option>
                       ))
                     ) : (
@@ -1964,7 +2016,7 @@ export default function MFFTrackerUI() {
                 </div>
 
                 <div className="text-sm">
-                  <div className="font-medium">Usage</div>
+                  <div className="font-medium">{t('usage')}</div>
                   <div className="mt-1 flex items-center gap-2">
                     {['PVE', 'PVP'].map((label) => (
                       <button
@@ -1993,12 +2045,13 @@ export default function MFFTrackerUI() {
                 </div>
 
                 <div className="text-sm">
-                  <div className="font-medium">Priority</div>
+                  <div className="font-medium">{t('priority')}</div>
                   <div className="mt-1">
                     <PriorityBadge
                       priority={editPriority}
                       onClick={() => setEditPriority((current) => cyclePriority(current))}
                       className="w-9 h-9"
+                      language={language}
                     />
                   </div>
                 </div>
@@ -2011,7 +2064,7 @@ export default function MFFTrackerUI() {
                       setEditingRow((current) => ({ ...current, done: event.target.checked }));
                     }}
                   />
-                  Completed
+                  {t('completion')}
                 </label>
 
                 {editErrors.detail && (
@@ -2029,14 +2082,14 @@ export default function MFFTrackerUI() {
                     onClick={closeEditRow}
                     className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer"
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
-                  <button
-                    type="submit"
-                    className="mff-save-button flex-1 px-4 py-2 rounded-2xl font-medium cursor-pointer"
-                  >
-                    Save
-                  </button>
+                <button
+                  type="submit"
+                  className="mff-save-button flex-1 px-4 py-2 rounded-2xl font-medium cursor-pointer"
+                >
+                  {t('save')}
+                </button>
                 </div>
               </form>
             </div>
