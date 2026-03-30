@@ -97,15 +97,16 @@
 
 ## Filters And Utilities
 
-- Search is split into a character name/alias field in the results header and structured metadata filters in the sidebar; origin, acquisition, tier, and category use multi-select chip filters, detail uses category-scoped pair chips, and CTP uses icon chips
+- Search is split into a character name/alias field in the results header and structured metadata filters in the sidebar; origin, acquisition, max tier, and category use multi-select chip filters, detail uses category-scoped pair chips, and CTP uses icon chips
 - Visible labels, badges, and helper text should follow the current UI language where the code supports it
 - The filters live in a left-edge drawer to keep the left column from feeling overloaded, and the floating `Filters` tab only appears when the drawer is closed
-- Name search matches the alias-aware character lookup rules, including English/slug queries
+- Name search matches the alias-aware character lookup rules, including English/slug queries and shared mantle aliases such as Nova, Wasp, Quasar, Captain America, Spider-Man, and Hulk
+- In English mode, visible character names should render in English via the slug-based display resolver where possible, including shared-mantle labels such as `Nova (Richard Rider)` and `Quasar (Avril Kincaid)`
 - Character search dropdown supports Arrow Up/Down and Enter selection while it is open
 - When the search matches a character with no tracked rows, character view shows a quick-add prompt that pre-fills the add form
 - Character View and Character List each have their own `Sort by` state; Character View defaults to `Last Added` and Character List defaults to `Name`
 - Character List shows only the characters present in the current filtered rows
-- Metadata search uses multi-select chip filters for origin type, acquisition label, and tier, plus icon chips for CTP
+- Metadata search uses multi-select chip filters for origin type, acquisition label including `일반`, and max tier, plus icon chips for CTP
 - Category filters are multi-select chip groups
 - Detail filters are category-scoped pair chips and can be cleared independently
 - Usage filtering is handled separately by the floating bottom island

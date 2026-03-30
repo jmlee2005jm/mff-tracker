@@ -15,6 +15,7 @@ import {
   sortCharacterGroups,
   runSanityTests,
   getCharacterEntry,
+  getAcquisitionType,
   characterMatchesQuery,
   getUsageSelectionLabel,
   getUsageTypeFromSelection,
@@ -499,9 +500,19 @@ export default function MFFTrackerUI() {
       map.get(row.category).add(row.detail);
     });
 
+    const detailOrder = new Map(DETAIL_OPTIONS['성장 필요'].map((detail, index) => [detail, index]));
+
     return Array.from(map.entries()).map(([category, detailSet]) => ({
       category,
-      details: Array.from(detailSet),
+      details: Array.from(detailSet).sort((a, b) => {
+        if (category === '성장 필요') {
+          const aRank = detailOrder.has(a) ? detailOrder.get(a) : Number.MAX_SAFE_INTEGER;
+          const bRank = detailOrder.has(b) ? detailOrder.get(b) : Number.MAX_SAFE_INTEGER;
+          if (aRank !== bRank) return aRank - bRank;
+        }
+
+        return a.localeCompare(b, 'ko');
+      }),
     }));
   }, [rows]);
 
@@ -551,7 +562,7 @@ export default function MFFTrackerUI() {
       const rowDetailKey = makeDetailKey(row.category, row.detail);
 
       const matchesOrigin = originSet.size === 0 || originSet.has(entry?.originType || '');
-      const matchesAcquisition = acquisitionSet.size === 0 || acquisitionSet.has(entry?.acquisitionType || '');
+      const matchesAcquisition = acquisitionSet.size === 0 || acquisitionSet.has(getAcquisitionType(entry));
       const matchesUpgrade = upgradeSet.size === 0 || upgradeSet.has(entry?.upgradeLevel || '');
       const matchesCtp = ctpSet.size === 0 || ctpSet.has(entryCtp || '');
       const matchesCategory = categorySet.size === 0 || categorySet.has(row.category);
@@ -603,7 +614,7 @@ export default function MFFTrackerUI() {
 
     selectedUpgrades.forEach((upgrade) => {
       chips.push({
-        label: `${t('tier')}: ${translateValue(language, UPGRADE_LABELS, upgrade)}`,
+        label: `${t('maxTier')}: ${translateValue(language, UPGRADE_LABELS, upgrade)}`,
         clear: () => setSelectedUpgrades((current) => current.filter((item) => item !== upgrade)),
       });
     });
@@ -1130,7 +1141,7 @@ export default function MFFTrackerUI() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-slate-500">{t('tier')}</label>
+                <label className="text-xs font-medium text-slate-500">{t('maxTier')}</label>
                 <button
                   type="button"
                   onClick={() => setSelectedUpgrades([])}
@@ -1418,7 +1429,7 @@ export default function MFFTrackerUI() {
                             }`}
                           >
                             <CharacterIcon name={name} preferLatest language={language} />
-                            <span>{name}</span>
+                            <span>{getCharacterDisplayName(name, language)}</span>
                           </div>
                         ))}
                       </div>
@@ -1694,7 +1705,7 @@ export default function MFFTrackerUI() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-3">
                         <CharacterIcon name={quickAddCharacter} preferLatest language={language} />
-                        <div className="text-lg font-semibold truncate">{quickAddCharacter}</div>
+                        <div className="text-lg font-semibold truncate">{getCharacterDisplayName(quickAddCharacter, language)}</div>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">{t('noTrackedEntries')}</p>
                     </div>
@@ -1727,7 +1738,7 @@ export default function MFFTrackerUI() {
                         <div className="flex items-center gap-3">
                           <CharacterIcon name={character} theme={theme} language={language} />
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-lg font-semibold">{character}</h3>
+                            <h3 className="text-lg font-semibold">{getCharacterDisplayName(character, language)}</h3>
                             <CharacterUpgradeBadges name={character} language={language} />
                             <CharacterAcquisitionBadge name={character} language={language} />
                             <CharacterOriginBadge name={character} language={language} />
@@ -1808,7 +1819,7 @@ export default function MFFTrackerUI() {
                         <div className="flex items-center gap-3 min-w-0">
                           <CharacterIcon name={character} theme={theme} language={language} />
                           <div className="min-w-0">
-                            <div className="font-semibold truncate">{character}</div>
+                            <div className="font-semibold truncate">{getCharacterDisplayName(character, language)}</div>
                             <div className="text-xs text-slate-500">{formatCountLabel(language, items.length)}</div>
                           </div>
                         </div>
@@ -1943,7 +1954,7 @@ export default function MFFTrackerUI() {
                           >
                             <CharacterIcon name={item.character} theme={theme} language={language} />
                             <span className={`max-w-36 truncate text-sm font-medium ${item.done ? 'line-through text-slate-400' : ''}`}>
-                              {getCharacterDisplayName(item.character)}
+                              {getCharacterDisplayName(item.character, language)}
                             </span>
                             <CharacterAcquisitionBadge name={item.character} language={language} />
                             <CharacterOriginBadge name={item.character} language={language} />

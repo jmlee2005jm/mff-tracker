@@ -99,19 +99,22 @@ Upgrade badges are rendered from these icons:
 - Character lookup ignores whitespace, dashes, punctuation, and case
 - Multi-word names support initials-style aliases for search and add-entry lookup
 - English/slug queries are also accepted through each character’s `slug`
+- Shared mantle aliases are included for families like Nova, Wasp, Quasar, Captain America, Spider-Man, and Hulk so different characters with the same hero name can be found together
+- Shared mantle display labels can include the civil name in parentheses for cases like Nova / Quasar
 - Canonical stored names still come from `src/characterData.js`
 
 ## Search
 
 - Character search and metadata filters are separate in the UI
 - Name search is alias-aware, matches the character lookup rules, accepts English/slug queries, and lives in the results header next to the grouping title
-- The main results view also shows removable filter chips for active search and metadata filters, including origin, acquisition, tier, category, category-scoped detail, and icon-based CTP chips
+- English mode renders character names in English where the slug-based display resolver has a readable mapping
+- The main results view also shows removable filter chips for active search and metadata filters, including origin, acquisition, max tier, category, category-scoped detail, and icon-based CTP chips
 - The full filter stack lives in a left-edge drawer so the left column stays usable, and its floating edge tab only appears while the drawer is closed
 - The Add Entry character field shows a small status chip next to the preview icon so you can tell whether the selected character already has tracked rows, and that preview defaults to the newest portrait unless you choose another uniform
 - A `!` badge beside the search bar cycles the minimum priority threshold for filtered rows
 - The character dropdown supports Arrow Up/Down and Enter selection while it is open
 - When a searched character has no tracked rows yet, the character view shows a quick-add prompt that pre-fills the add form
-- Metadata search is structured through multi-select chip filters for origin type, acquisition label, tier, and icon-based CTP chips, while category uses multi-select chips and detail is filtered by category/detail pairs
+- Metadata search is structured through multi-select chip filters for origin type, acquisition label including `일반`, max tier, and icon-based CTP chips, while category uses multi-select chips and detail is filtered by category/detail pairs
 - Category View displays the canonical Korean character name even if the stored row used a slug or English alias
 
 ## Usage Filter

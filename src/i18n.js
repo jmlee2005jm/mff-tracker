@@ -25,8 +25,9 @@ export const UI_TEXT = {
     lastAdded: '최근 추가',
     name: '이름',
     origin: '태생',
-    acquisition: '획득',
-    tier: '티어',
+  acquisition: '획득',
+  tier: '티어',
+  maxTier: '최대 티어',
     completion: '완료',
     taskCount: '항목 수',
     priority: '우선순위',
@@ -105,8 +106,9 @@ export const UI_TEXT = {
     lastAdded: 'Last Added',
     name: 'Name',
     origin: 'Origin',
-    acquisition: 'Acquisition',
-    tier: 'Tier',
+  acquisition: 'Acquisition',
+  tier: 'Tier',
+  maxTier: 'Max Tier',
     completion: 'Completion',
     taskCount: 'Task Count',
     priority: 'Priority',
@@ -214,12 +216,14 @@ export const ORIGIN_LABELS = {
 
 export const ACQUISITION_LABELS = {
   ko: {
+    일반: '일반',
     수정캐: '수정캐',
     디럭스: '디럭스',
     엑조디아: '엑조디아',
     '매생/매엑': '매생/매엑',
   },
   en: {
+    일반: 'Normal',
     수정캐: 'Crystal',
     디럭스: 'Deluxe',
     엑조디아: 'Exodia',
