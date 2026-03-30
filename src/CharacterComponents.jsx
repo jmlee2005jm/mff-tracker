@@ -12,13 +12,15 @@ import {
 import {
   getBaseIconUrlBySlug,
   getUniformIconUrlBySlug,
-  findLatestUniformNumber,
   findAvailableUniformNumbers,
+  getUniformOptionsCacheKey,
+  clearUniformNumbersCache,
+  refreshUniformNumbersCache,
+  warmUniformNumbersCache,
 } from './iconUtils';
 
 const CHARACTER_UNIFORM_OVERRIDES_KEY = 'mff_character_uniform_overrides_v1';
 const CHARACTER_UNIFORM_CHANGE_EVENT = 'mff:character-uniform-change';
-const CHARACTER_UNIFORM_OPTIONS_KEY = 'mff_character_uniform_options_v1';
 const CHARACTER_UNIFORM_AUTO = 0;
 const CHARACTER_UNIFORM_BASE = -1;
 
@@ -29,8 +31,8 @@ const UPGRADE_ICON_BY_LEVEL = {
   '4티': 'https://thanosvibs.money/static/attributes/t4.png',
 };
 
-const DISPLAY_ACQUISITION_TYPES = new Set(['수정캐', '디럭스', '엑조디아', '매생/매엑']);
-export const CTP_TYPES = ['통찰', '극복', '탐욕', '해방', '분노', '경쟁', '파괴', '제련', '권능', '심판', '재생', '역전', '격동', '인내', '초월'];
+const DISPLAY_ACQUISITION_TYPES = new Set(['공헌도', '수정캐', '디럭스', '엑조디아', '매생/매엑']);
+export const CTP_TYPES = ['통찰', '극복', '탐욕', '해방', '분노', '경쟁', '파괴', '제련', '권능', '심판', '재생', '격동', '인내', '초월'];
 export const CTP_ICON_BY_TYPE = {
   통찰: 'https://thanosvibs.money/static/assets/items/ctp_insight.png',
   극복: 'https://thanosvibs.money/static/assets/items/ctp_conquest.png',
@@ -43,7 +45,6 @@ export const CTP_ICON_BY_TYPE = {
   권능: 'https://thanosvibs.money/static/assets/items/ctp_authority.png',
   심판: 'https://thanosvibs.money/static/assets/items/ctp_judgement.png',
   재생: 'https://thanosvibs.money/static/assets/items/ctp_regeneration.png',
-  역전: 'https://thanosvibs.money/static/assets/items/ctp_veteran.png',
   격동: 'https://thanosvibs.money/static/assets/items/ctp_energy.png',
   인내: 'https://thanosvibs.money/static/assets/items/ctp_patience.png',
   초월: 'https://thanosvibs.money/static/assets/items/ctp_transcendence.png',
@@ -60,7 +61,6 @@ const CTP_BADGE_STYLE_BY_TYPE = {
   권능: 'shadow-[0_0_14px_rgba(234,179,8,0.66),_0_0_24px_rgba(234,179,8,0.38)]',
   심판: 'shadow-[0_0_14px_rgba(245,158,11,0.65),_0_0_24px_rgba(245,158,11,0.38)]',
   재생: 'shadow-[0_0_14px_rgba(34,197,94,0.62),_0_0_24px_rgba(34,197,94,0.36)]',
-  역전: 'shadow-[0_0_14px_rgba(234,179,8,0.66),_0_0_24px_rgba(234,179,8,0.38)]',
   격동: 'shadow-[0_0_14px_rgba(251,146,60,0.62),_0_0_24px_rgba(251,146,60,0.36)]',
   인내: 'shadow-[0_0_14px_rgba(45,212,191,0.62),_0_0_24px_rgba(45,212,191,0.36)]',
   초월: 'shadow-[0_0_14px_rgba(59,130,246,0.62),_0_0_24px_rgba(59,130,246,0.36)]',
@@ -143,13 +143,15 @@ function setCharacterUniformOverride(slug, uniformNumber) {
 
 function loadUniformOptionsCache(slug) {
   try {
-    const saved = window.localStorage.getItem(`${CHARACTER_UNIFORM_OPTIONS_KEY}_${slug}_v1`);
+    const saved = window.localStorage.getItem(getUniformOptionsCacheKey(slug));
     if (!saved) return null;
 
     const parsed = JSON.parse(saved);
     if (!Array.isArray(parsed)) return null;
 
-    return parsed.filter((value) => Number.isInteger(value) && value > 0);
+    return Array.from(
+      new Set(parsed.filter((value) => Number.isInteger(value) && value > 0))
+    ).sort((a, b) => a - b);
   } catch {
     return null;
   }
@@ -167,10 +169,7 @@ function loadImage(src) {
 
 function saveUniformOptionsCache(slug, numbers) {
   try {
-    window.localStorage.setItem(
-      `${CHARACTER_UNIFORM_OPTIONS_KEY}_${slug}_v1`,
-      JSON.stringify(numbers)
-    );
+    window.localStorage.setItem(getUniformOptionsCacheKey(slug), JSON.stringify(numbers));
   } catch {
     // ignore storage errors
   }
@@ -180,7 +179,9 @@ function CharacterIconFace({
   name,
   className = 'w-10 h-10',
   uniformNumberOverride = 0,
-  preferLatest = false,
+  preferLatest = true,
+  availableUniformNumbers = [],
+  uniformNumbersRefreshing = false,
   language = 'ko',
 }) {
   const [src, setSrc] = useState(null);
@@ -211,28 +212,21 @@ function CharacterIconFace({
         targetSrc = getBaseIconUrlBySlug(slug);
       } else if (overrideNumber > 0) {
         targetSrc = getUniformIconUrlBySlug(slug, overrideNumber);
-      } else if (!preferLatest && Number.isInteger(entry.iconUniformNumber)) {
-        targetSrc =
-          entry.iconUniformNumber === CHARACTER_UNIFORM_BASE
-            ? getBaseIconUrlBySlug(slug)
-            : getUniformIconUrlBySlug(slug, entry.iconUniformNumber);
-      } else {
-        const cacheKey = `mff_latest_uniform_${slug}_v3`;
-        const cached = window.localStorage.getItem(cacheKey);
-        if (cached !== null) {
-          const cachedNumber = Number(cached);
-          targetSrc =
-            cachedNumber > 0
-              ? getUniformIconUrlBySlug(slug, cachedNumber)
-              : getBaseIconUrlBySlug(slug);
-        } else {
-          const latest = await findLatestUniformNumber(slug, 50);
-          window.localStorage.setItem(cacheKey, String(latest));
-          targetSrc =
-            latest > 0
-              ? getUniformIconUrlBySlug(slug, latest)
-              : getBaseIconUrlBySlug(slug);
+      } else if (availableUniformNumbers.length > 0) {
+        const latestKnown = availableUniformNumbers[availableUniformNumbers.length - 1];
+        targetSrc = getUniformIconUrlBySlug(slug, latestKnown);
+      } else if (preferLatest && uniformNumbersRefreshing) {
+        if (!cancelled) {
+          setLoading(true);
         }
+        return;
+      } else {
+        const numbers = await warmUniformNumbersCache(slug, 50);
+        const latestKnown = numbers.length > 0 ? numbers[numbers.length - 1] : 0;
+        targetSrc =
+          latestKnown > 0
+            ? getUniformIconUrlBySlug(slug, latestKnown)
+            : getBaseIconUrlBySlug(slug);
       }
 
       try {
@@ -256,7 +250,7 @@ function CharacterIconFace({
     return () => {
       cancelled = true;
     };
-  }, [name, preferLatest, uniformNumberOverride]);
+  }, [name, preferLatest, uniformNumberOverride, availableUniformNumbers.join(','), uniformNumbersRefreshing]);
 
   if (!src || failed) {
     return (
@@ -280,7 +274,7 @@ function CharacterIconFace({
   );
 }
 
-export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
+export function CharacterIcon({ name, preferLatest = true, language = 'ko' }) {
   const entry = getCharacterEntry(name);
   const slug = entry?.slug || '';
   const buttonRef = useRef(null);
@@ -291,6 +285,7 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
     slug ? loadUniformOptionsCache(slug) || [] : []
   );
   const [loadingUniformNumbers, setLoadingUniformNumbers] = useState(false);
+  const [refreshingUniformNumbers, setRefreshingUniformNumbers] = useState(false);
   const [uniformOverride, setUniformOverride] = useState(() => (slug ? getCharacterUniformOverride(slug) : 0));
 
   useEffect(() => {
@@ -318,11 +313,11 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
   }, [slug]);
 
   useEffect(() => {
-    if (!open || !slug) return;
+    if (!slug) return;
 
     let cancelled = false;
 
-    async function loadUniformNumbers() {
+    async function refreshUniformNumbers() {
       const cached = loadUniformOptionsCache(slug);
       if (cached && cached.length > 0) {
         setAvailableUniformNumbers(cached);
@@ -335,8 +330,11 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
         const numbers = await findAvailableUniformNumbers(slug, 50);
         if (cancelled) return;
 
-        setAvailableUniformNumbers(numbers);
-        saveUniformOptionsCache(slug, numbers);
+        const normalizedNumbers = Array.from(
+          new Set(numbers.filter((value) => Number.isInteger(value) && value > 0))
+        ).sort((a, b) => a - b);
+        setAvailableUniformNumbers(normalizedNumbers);
+        saveUniformOptionsCache(slug, normalizedNumbers);
       } finally {
         if (!cancelled) {
           setLoadingUniformNumbers(false);
@@ -344,7 +342,7 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
       }
     }
 
-    loadUniformNumbers();
+    refreshUniformNumbers();
 
     return () => {
       cancelled = true;
@@ -413,7 +411,15 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
     : getUiText(language, 'auto');
 
   if (!entry?.slug) {
-    return <CharacterIconFace name={name} className="w-10 h-10" preferLatest={preferLatest} language={language} />;
+    return (
+      <CharacterIconFace
+        name={name}
+        className="w-10 h-10"
+        preferLatest={preferLatest}
+        availableUniformNumbers={availableUniformNumbers}
+        language={language}
+      />
+    );
   }
 
   return (
@@ -432,6 +438,8 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
         <CharacterIconFace
           name={name}
           preferLatest={preferLatest}
+          availableUniformNumbers={availableUniformNumbers}
+          uniformNumbersRefreshing={loadingUniformNumbers}
           uniformNumberOverride={selectedUniformNumber}
           className="w-10 h-10"
           language={language}
@@ -457,6 +465,25 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
         >
           <button
             type="button"
+            onClick={async () => {
+              if (!slug) return;
+              setRefreshingUniformNumbers(true);
+              clearUniformNumbersCache(slug);
+              try {
+                const numbers = await refreshUniformNumbersCache(slug, 50);
+                setAvailableUniformNumbers(numbers);
+              } finally {
+                setRefreshingUniformNumbers(false);
+              }
+            }}
+            className="col-span-4 flex items-center justify-center gap-2 px-3 py-2 rounded-xl border bg-slate-50 text-slate-700 text-sm font-medium hover:bg-slate-100"
+          >
+            <span aria-hidden="true">↻</span>
+            <span>{getUiText(language, 'refresh')}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               setCharacterUniformOverride(slug, CHARACTER_UNIFORM_BASE);
               setOpen(false);
@@ -467,6 +494,8 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
             <CharacterIconFace
               name={name}
               uniformNumberOverride={CHARACTER_UNIFORM_BASE}
+              availableUniformNumbers={availableUniformNumbers}
+              uniformNumbersRefreshing={loadingUniformNumbers || refreshingUniformNumbers}
               className="w-8 h-8"
               language={language}
             />
@@ -507,6 +536,8 @@ export function CharacterIcon({ name, preferLatest = false, language = 'ko' }) {
                 <CharacterIconFace
                   name={name}
                   uniformNumberOverride={number}
+                  availableUniformNumbers={availableUniformNumbers}
+                  uniformNumbersRefreshing={loadingUniformNumbers || refreshingUniformNumbers}
                   className="w-10 h-10"
                   language={language}
                 />
@@ -549,6 +580,7 @@ export function CharacterAcquisitionBadge({ name, language = 'ko' }) {
   if (!acquisitionType || !DISPLAY_ACQUISITION_TYPES.has(acquisitionType)) return null;
 
   const styles = {
+    '공헌도': 'bg-blue-100 text-blue-800 border-blue-200 shadow-[0_0_10px_rgba(59,130,246,0.4)]',
     '수정캐': 'bg-sky-100 text-sky-800 border-sky-200',
     '디럭스': 'bg-violet-100 text-violet-800 border-violet-200 shadow-[0_0_10px_rgba(139,92,246,0.55)]',
     '엑조디아': 'bg-orange-100 text-orange-800 border-orange-200 shadow-[0_0_10px_rgba(251,146,60,0.45)]',
@@ -658,6 +690,20 @@ export function PriorityBadge({ priority = 0, onClick, className = 'w-8 h-8', la
     >
       {label}
     </span>
+  );
+}
+
+export function CTPPriorityBadge({ priority = 0, onClick, className = 'w-8 h-8', language = 'ko' }) {
+  return (
+    <div className="inline-flex flex-col items-center gap-0.5 shrink-0">
+      <span className="text-[9px] font-semibold leading-none text-slate-500">CTP</span>
+      <PriorityBadge
+        priority={priority}
+        onClick={onClick}
+        className={className}
+        language={language}
+      />
+    </div>
   );
 }
 

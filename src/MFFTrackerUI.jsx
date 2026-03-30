@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTP_ICON_BY_TYPE } from './CharacterComponents';
+import { CharacterIcon, CharacterOriginBadge, CharacterAcquisitionBadge, CharacterUpgradeBadges, CharacterUsageBadge, PriorityBadge, CTPPriorityBadge, CTP_ICON_BY_TYPE } from './CharacterComponents';
 import CtpPicker from './CtpPicker';
 import {
   CATEGORY_OPTIONS,
@@ -13,7 +13,6 @@ import {
   groupRowsByCharacter,
   groupRowsByCategory,
   sortCharacterGroups,
-  runSanityTests,
   getCharacterEntry,
   getAcquisitionType,
   characterMatchesQuery,
@@ -53,6 +52,7 @@ const USAGE_FILTER_KEY = 'mff_tracker_usage_filter_v1';
 const PVP_MIGRATION_KEY = 'mff_tracker_usage_migrated_to_pvp_v1';
 const THEME_KEY = 'mff_tracker_theme_v1';
 const CHARACTER_CTP_OVERRIDES_KEY = 'mff_tracker_character_ctp_overrides_v1';
+const CHARACTER_CTP_PRIORITY_OVERRIDES_KEY = 'mff_tracker_character_ctp_priority_overrides_v1';
 
 function isPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -72,7 +72,10 @@ function normalizeLoadedRow(row) {
     id: Number.isInteger(Number(rest.id)) ? Number(rest.id) : 0,
     character: sanitizeText(rest.character),
     category: sanitizeText(rest.category),
-    detail: sanitizeText(rest.detail),
+    detail:
+      sanitizeText(rest.category) === '유니폼 필요' && sanitizeText(rest.detail) === '일반'
+        ? '상시 판매'
+        : sanitizeText(rest.detail),
     done: !!rest.done,
     priority: normalizePriority(rest.priority),
     usageType: normalizeUsageType(rest.usageType),
@@ -188,6 +191,24 @@ function loadCharacterCtpOverrides() {
 
     return Object.fromEntries(
       Object.entries(parsed).map(([name, value]) => [name, normalizeCtpType(value)])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function loadCharacterCtpPriorityOverrides() {
+  try {
+    const saved = window.localStorage.getItem(CHARACTER_CTP_PRIORITY_OVERRIDES_KEY);
+    if (!saved) return {};
+
+    const parsed = JSON.parse(saved);
+    if (!isPlainObject(parsed)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed).map(([name, value]) => [name, normalizePriority(value)])
     );
   } catch {
     return {};
@@ -311,11 +332,11 @@ export default function MFFTrackerUI() {
   const [characterSortDirection, setCharacterSortDirection] = useState('asc');
   const [rosterSort, setRosterSort] = useState('name');
   const [rosterSortDirection, setRosterSortDirection] = useState('asc');
-  const [entryUsageSelection, setEntryUsageSelection] = useState(normalizeUsageSelection({ PVE: true, PVP: true }));
+  const [entryUsageSelection, setEntryUsageSelection] = useState(normalizeUsageSelection({ PVE: true, PVP: false }));
   const [form, setForm] = useState({
     character: '',
     category: '유니폼 필요',
-    detail: '일반',
+    detail: '상시 판매',
   });
   const [errors, setErrors] = useState({
     character: '',
@@ -335,13 +356,62 @@ export default function MFFTrackerUI() {
   });
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showSanityTests, setShowSanityTests] = useState(false);
+  const [showAddDrawer, setShowAddDrawer] = useState(false);
   const [showFiltersDrawer, setShowFiltersDrawer] = useState(false);
+  const [showRightDock, setShowRightDock] = useState(false);
   const [draggingRowId, setDraggingRowId] = useState(null);
   const [dragTargetGroupKey, setDragTargetGroupKey] = useState('');
 
   const importFileRef = useRef(null);
   const characterDropdownItemRefs = useRef([]);
+  const rightDockHideTimerRef = useRef(null);
+  const [characterCtpPriorityOverrides, setCharacterCtpPriorityOverrides] = useState(() => loadCharacterCtpPriorityOverrides());
+
+  const openRightDock = () => {
+    if (rightDockHideTimerRef.current) {
+      window.clearTimeout(rightDockHideTimerRef.current);
+      rightDockHideTimerRef.current = null;
+    }
+    setShowRightDock(true);
+  };
+
+  const closeRightDockSoon = () => {
+    if (rightDockHideTimerRef.current) {
+      window.clearTimeout(rightDockHideTimerRef.current);
+    }
+
+    rightDockHideTimerRef.current = window.setTimeout(() => {
+      setShowRightDock(false);
+      rightDockHideTimerRef.current = null;
+    }, 120);
+  };
+
+  useEffect(() => {
+    const updateRightDockFromPointer = (event) => {
+      if (typeof window === 'undefined') return;
+
+      const threshold = window.innerWidth * 0.85;
+      if (event.clientX >= threshold) {
+        openRightDock();
+      } else if (!showAddDrawer && !showFiltersDrawer) {
+        closeRightDockSoon();
+      }
+    };
+
+    window.addEventListener('mousemove', updateRightDockFromPointer, { passive: true });
+
+    return () => {
+      window.removeEventListener('mousemove', updateRightDockFromPointer);
+    };
+  }, [showAddDrawer, showFiltersDrawer]);
+
+  useEffect(() => {
+    return () => {
+      if (rightDockHideTimerRef.current) {
+        window.clearTimeout(rightDockHideTimerRef.current);
+      }
+    };
+  }, []);
 
   const getCharacterCtp = (character) => {
     if (Object.prototype.hasOwnProperty.call(characterCtpOverrides, character)) {
@@ -356,6 +426,21 @@ export default function MFFTrackerUI() {
     setCharacterCtpOverrides((current) => ({
       ...current,
       [character]: nextCtp,
+    }));
+  };
+
+  const getCharacterCtpPriority = (character) => {
+    if (Object.prototype.hasOwnProperty.call(characterCtpPriorityOverrides, character)) {
+      return normalizePriority(characterCtpPriorityOverrides[character]);
+    }
+
+    return 1;
+  };
+
+  const cycleCharacterCtpPriority = (character) => {
+    setCharacterCtpPriorityOverrides((current) => ({
+      ...current,
+      [character]: cyclePriority(current[character]),
     }));
   };
 
@@ -417,6 +502,17 @@ export default function MFFTrackerUI() {
       // ignore storage errors
     }
   }, [characterCtpOverrides]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        CHARACTER_CTP_PRIORITY_OVERRIDES_KEY,
+        JSON.stringify(characterCtpPriorityOverrides)
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [characterCtpPriorityOverrides]);
 
   useEffect(() => {
     try {
@@ -483,7 +579,6 @@ export default function MFFTrackerUI() {
     document.documentElement.lang = language === 'en' ? 'en' : 'ko';
   }, [language]);
   
-  const sanityTests = useMemo(() => runSanityTests(), []);
   const t = (key) => getUiText(language, key);
 
   const categories = useMemo(() => {
@@ -787,6 +882,8 @@ export default function MFFTrackerUI() {
         detail: nextOptions[0] || '',
       };
     });
+
+    setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: false }));
   }
 
   function openEditRow(row) {
@@ -890,7 +987,7 @@ export default function MFFTrackerUI() {
     );
   }
 
-  function exportJson() {
+  function exportFile() {
     const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -912,9 +1009,11 @@ export default function MFFTrackerUI() {
     setSelectedDetails([]);
     setShowDone(true);
     setMinimumPriorityFilter(1);
-    setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: true }));
-    setForm({ character: '', category: '유니폼 필요', detail: '' });
+    setEntryUsageSelection(normalizeUsageSelection({ PVE: true, PVP: false }));
+    setForm({ character: '', category: '유니폼 필요', detail: '상시 판매' });
     setShowResetConfirm(false);
+    setCharacterCtpOverrides({});
+    setCharacterCtpPriorityOverrides({});
 
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
@@ -922,12 +1021,14 @@ export default function MFFTrackerUI() {
       Object.values(LEGACY_STORAGE_KEYS_BY_MODE).forEach((key) => {
         window.localStorage.removeItem(key);
       });
+      window.localStorage.removeItem(CHARACTER_CTP_OVERRIDES_KEY);
+      window.localStorage.removeItem(CHARACTER_CTP_PRIORITY_OVERRIDES_KEY);
     } catch {
       // ignore storage errors
     }
   }
 
-  function handleImportJson(event) {
+  function handleImportFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -977,15 +1078,13 @@ export default function MFFTrackerUI() {
 
     reader.readAsText(file);
   }
-  const passedCount = sanityTests.filter((test) => test.pass).length;
-
   return (
     <div className={`mff-app ${theme === 'dark' ? 'mff-theme-dark' : 'mff-theme-light'} min-h-screen p-6`}>
       <input
         ref={importFileRef}
         type="file"
         accept="application/json"
-        onChange={handleImportJson}
+        onChange={handleImportFile}
         className="hidden"
       />
       <div className="max-w-7xl mx-auto space-y-6 pb-24">
@@ -1022,21 +1121,33 @@ export default function MFFTrackerUI() {
               </button>
               <button
                 onClick={() => setView('character')}
-                className={`px-4 py-2 rounded-2xl border ${view === 'character' ? 'bg-slate-900 text-white' : 'bg-white'}`}
+                className={`px-4 py-2 rounded-2xl border transition-colors duration-150 ${
+                  view === 'character'
+                    ? 'bg-slate-950 text-white border-slate-950 shadow-md'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
                 {t('characterView')}
               </button>
               <button
-                onClick={() => setView('category')}
-                className={`px-4 py-2 rounded-2xl border ${view === 'category' ? 'bg-slate-900 text-white' : 'bg-white'}`}
-              >
-                {t('categoryView')}
-              </button>
-              <button
                 onClick={() => setView('roster')}
-                className={`px-4 py-2 rounded-2xl border ${view === 'roster' ? 'bg-slate-900 text-white' : 'bg-white'}`}
+                className={`px-4 py-2 rounded-2xl border transition-colors duration-150 ${
+                  view === 'roster'
+                    ? 'bg-slate-950 text-white border-slate-950 shadow-md'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
                 {t('characterList')}
+              </button>
+              <button
+                onClick={() => setView('category')}
+                className={`px-4 py-2 rounded-2xl border transition-colors duration-150 ${
+                  view === 'category'
+                    ? 'bg-slate-950 text-white border-slate-950 shadow-md'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {t('categoryView')}
               </button>
             </div>
           </div>
@@ -1044,20 +1155,287 @@ export default function MFFTrackerUI() {
 
         <button
           type="button"
-          onClick={() => setShowFiltersDrawer(true)}
+          onClick={() => {
+            setShowAddDrawer(false);
+            setShowFiltersDrawer(true);
+          }}
+          onMouseEnter={openRightDock}
+          onMouseLeave={closeRightDockSoon}
           aria-hidden={showFiltersDrawer}
           tabIndex={showFiltersDrawer ? -1 : 0}
-          className={`fixed left-0 top-1/2 z-50 -translate-y-1/2 rounded-r-2xl border border-l-0 bg-white px-5 py-3 shadow-xl text-base font-semibold transition-all duration-200 ease-out ${
-            showFiltersDrawer
-              ? 'pointer-events-none opacity-0 -translate-x-8'
-              : 'pointer-events-auto opacity-100 translate-x-0'
+          className={`fixed right-0 top-[40%] z-[80] -translate-y-1/2 w-36 justify-center rounded-l-2xl border border-r-0 bg-white px-5 py-3 shadow-xl text-base font-semibold transition-all duration-200 ease-out ${
+            showRightDock && !showAddDrawer && !showFiltersDrawer
+              ? 'pointer-events-auto opacity-100 translate-x-0'
+              : 'pointer-events-none opacity-80 translate-x-[78%]'
           }`}
         >
           {t('filters')}
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            setShowFiltersDrawer(false);
+            setShowAddDrawer(true);
+          }}
+          onMouseEnter={openRightDock}
+          onMouseLeave={closeRightDockSoon}
+          aria-hidden={showAddDrawer}
+          tabIndex={showAddDrawer ? -1 : 0}
+          className={`fixed right-0 top-[33%] z-[80] -translate-y-1/2 w-36 justify-center rounded-l-2xl border border-r-0 bg-white px-5 py-3 shadow-xl text-base font-semibold transition-all duration-200 ease-out ${
+            showRightDock && !showAddDrawer && !showFiltersDrawer
+              ? 'pointer-events-auto opacity-100 translate-x-0'
+              : 'pointer-events-none opacity-80 translate-x-[78%]'
+          }`}
+        >
+          {t('addEntry')}
+        </button>
+
         <div
-          className={`fixed left-4 top-1/2 z-40 w-80 max-w-[80vw] -translate-y-1/2 rounded-3xl border bg-white shadow-2xl p-5 space-y-4 transition-all duration-200 ${
+          onMouseEnter={openRightDock}
+          className={`fixed right-4 top-1/2 z-[80] w-[28rem] max-w-[80vw] -translate-y-1/2 rounded-3xl border bg-white shadow-2xl p-5 space-y-4 transition-all duration-200 ${
+            showAddDrawer
+              ? 'opacity-100 scale-100 pointer-events-auto'
+              : 'opacity-0 scale-95 pointer-events-none'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold">{t('addEntry')}</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddDrawer(false);
+                setShowRightDock(false);
+              }}
+              className="text-sm px-3 py-1.5 rounded-full border bg-slate-100 text-slate-700"
+            >
+              {t('close')}
+            </button>
+          </div>
+          <form onSubmit={addRow} className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">{t('character')}</label>
+              <div className="relative flex items-center">
+                <input
+                  value={form.character}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    const nextOptions = getAvailableDetailOptions(form.category, value);
+                    if (errors.character) {
+                      setErrors({ ...errors, character: '' });
+                    }
+                    const filtered = characterNames.filter((name) => characterMatchesQuery(name, value));
+                    setFilteredCharacters(filtered);
+                    setShowCharacterDropdown(value.length > 0 && filtered.length > 0);
+                    setCharacterDropdownIndex(0);
+                    setForm((prev) => ({
+                      ...prev,
+                      character: value,
+                      detail: prev.category === '성장 필요' ? nextOptions[0] || '' : prev.detail,
+                    }));
+                  }}
+                  onFocus={() => {
+                    if (form.character) {
+                      const filtered = characterNames.filter((name) =>
+                        characterMatchesQuery(name, form.character)
+                      );
+                      setFilteredCharacters(filtered);
+                      setShowCharacterDropdown(filtered.length > 0);
+                      setCharacterDropdownIndex(0);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (!showCharacterDropdown || filteredCharacters.length === 0) return;
+
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setCharacterDropdownIndex((current) => (current + 1) % Math.min(filteredCharacters.length, 10));
+                    } else if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setCharacterDropdownIndex((current) => {
+                        const limit = Math.min(filteredCharacters.length, 10);
+                        return (current - 1 + limit) % limit;
+                      });
+                    } else if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const selected = visibleCharacterOptions[characterDropdownIndex];
+                      if (selected) {
+                        selectCharacter(selected);
+                      }
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setShowCharacterDropdown(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowCharacterDropdown(false), 150);
+                  }}
+                  placeholder={t('search')}
+                  className={`flex-1 mt-1 px-3 py-2 rounded-2xl border ${
+                    errors.character ? 'border-red-500' : ''
+                  }`}
+                />
+                {form.character && selectedCharacterEntry && (
+                  <div className="ml-2 mt-1 flex items-center gap-2">
+                    <CharacterIcon name={form.character} preferLatest language={language} />
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full border font-medium whitespace-nowrap ${
+                        selectedCharacterRowCount > 0
+                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      }`}
+                      title={
+                        selectedCharacterRowCount > 0
+                          ? formatCountLabel(language, selectedCharacterRowCount)
+                          : t('noEntries')
+                      }
+                    >
+                      {selectedCharacterRowCount > 0
+                        ? formatCountLabel(language, selectedCharacterRowCount)
+                        : t('new')}
+                    </span>
+                  </div>
+                )}
+                {showCharacterDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto top-full">
+                    {visibleCharacterOptions.map((name, index) => (
+                      <div
+                        key={name}
+                        ref={(node) => {
+                          characterDropdownItemRefs.current[index] = node;
+                        }}
+                        onClick={() => {
+                          selectCharacter(name);
+                        }}
+                        className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${
+                          characterDropdownIndex === index
+                            ? 'bg-gray-100'
+                            : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        <CharacterIcon name={name} preferLatest language={language} />
+                        <span>{getCharacterDisplayName(name, language)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {errors.character && (
+                <p className="text-red-500 text-xs mt-1">{errors.character}</p>
+              )}
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t('category')}</label>
+              <select
+                value={form.category}
+                onChange={(event) => {
+                  const nextCategory = event.target.value;
+                  const nextOptions = getAvailableDetailOptions(nextCategory, form.character);
+
+                  setForm({
+                    ...form,
+                    category: nextCategory,
+                    detail: nextOptions[0] || '',
+                  });
+                }}
+                className="w-full mt-1 px-3 py-2 rounded-2xl border"
+              >
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {translateValue(language, CATEGORY_LABELS, option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {form.category !== '획득 필요' && (
+              <div>
+                <label className="text-sm font-medium">{t('detail')}</label>
+                <select
+                  value={formDetailValue}
+                  disabled={availableDetailOptions.length === 0}
+                  onChange={(event) => {
+                    setForm({ ...form, detail: event.target.value });
+                    if (errors.detail) {
+                      setErrors({ ...errors, detail: '' });
+                    }
+                  }}
+                  className={`w-full mt-1 px-3 py-2 rounded-2xl border ${
+                    errors.detail ? 'border-red-500' : ''
+                  }`}
+                >
+                  {availableDetailOptions.length > 0 ? (
+                    availableDetailOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {translateValue(language, DETAIL_LABELS, option)}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      -
+                    </option>
+                  )}
+                </select>
+
+                {errors.detail && (
+                  <p className="text-red-500 text-xs mt-1">{errors.detail}</p>
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              {['PVE', 'PVP'].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setEntryUsageSelection((current) => {
+                      const nextValue =
+                        label === 'PVE'
+                          ? current.PVE
+                            ? { PVE: false, PVP: true }
+                            : { PVE: true, PVP: false }
+                          : current.PVP
+                            ? { PVE: true, PVP: false }
+                            : { PVE: false, PVP: true };
+
+                      return normalizeUsageSelection(nextValue);
+                    });
+                  }}
+                  aria-pressed={!!entryUsageSelection[label]}
+                  className={`px-3 py-2 rounded-2xl border text-sm font-medium ${
+                    label === 'PVE'
+                      ? entryUsageSelection[label]
+                        ? 'bg-sky-200 text-sky-900 border-sky-300'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                      : entryUsageSelection[label]
+                        ? 'bg-rose-200 text-rose-900 border-rose-300'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button className="mff-add-button w-full px-4 py-2 rounded-2xl font-medium cursor-pointer">
+              {t('addEntry')}
+            </button>
+          </form>
+
+          {successMessage && (
+            <div className="mt-3 px-3 py-2 rounded-2xl bg-green-50 text-green-800 border border-green-200 text-sm">
+              {successMessage}
+            </div>
+          )}
+
+          {errors.general && (
+            <div className="mt-3 px-3 py-2 rounded-2xl bg-red-50 text-red-800 border border-red-200 text-sm">
+              {errors.general}
+            </div>
+          )}
+        </div>
+
+        <div
+          onMouseEnter={openRightDock}
+          className={`fixed right-4 top-1/2 z-[80] w-80 max-w-[80vw] -translate-y-1/2 rounded-3xl border bg-white shadow-2xl p-5 space-y-4 transition-all duration-200 ${
             showFiltersDrawer
               ? 'opacity-100 scale-100 pointer-events-auto'
               : 'opacity-0 scale-95 pointer-events-none'
@@ -1294,301 +1672,42 @@ export default function MFFTrackerUI() {
             </div>
           </div>
         </div>
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl shadow-sm border px-4 py-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (showResetConfirm) {
+                  resetAll();
+                } else {
+                  setShowResetConfirm(true);
+                }
+              }}
+              className={`px-4 py-2 rounded-2xl border cursor-pointer ${
+                showResetConfirm ? 'border-red-300 bg-red-50 text-red-700' : ''
+              }`}
+            >
+              {showResetConfirm ? t('resetConfirm') : t('reset')}
+            </button>
 
-        <div className="grid lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-1 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto bg-white rounded-3xl shadow-sm border p-5 h-fit space-y-6">
-            <div>
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <h2 className="text-xl font-semibold">{t('addEntry')}</h2>
-                <div className="flex items-center gap-2">
-                  {['PVE', 'PVP'].map((label) => (
-                    <button
-                      key={label}
-                      type="button"
-                      onClick={() => {
-                        setEntryUsageSelection((current) => ({
-                          ...current,
-                          [label]: !current[label],
-                        }));
-                      }}
-                      className={`px-3 py-2 rounded-2xl border text-sm font-medium ${
-                        label === 'PVE'
-                          ? entryUsageSelection[label]
-                            ? 'bg-sky-200 text-sky-900 border-sky-300'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                          : entryUsageSelection[label]
-                            ? 'bg-rose-200 text-rose-900 border-rose-300'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <form onSubmit={addRow} className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium">{t('character')}</label>
-                  <div className="relative flex items-center">
-                    <input
-                      value={form.character}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        const nextOptions = getAvailableDetailOptions(form.category, value);
-                        if (errors.character) {
-                          setErrors({ ...errors, character: '' });
-                        }
-                        const filtered = characterNames.filter((name) => characterMatchesQuery(name, value));
-                        setFilteredCharacters(filtered);
-                        setShowCharacterDropdown(value.length > 0 && filtered.length > 0);
-                        setCharacterDropdownIndex(0);
-                        setForm((prev) => ({
-                          ...prev,
-                          character: value,
-                          detail: prev.category === '성장 필요' ? nextOptions[0] || '' : prev.detail,
-                        }));
-                      }}
-                      onFocus={() => {
-                        if (form.character) {
-                          const filtered = characterNames.filter((name) =>
-                            characterMatchesQuery(name, form.character)
-                          );
-                          setFilteredCharacters(filtered);
-                          setShowCharacterDropdown(filtered.length > 0);
-                          setCharacterDropdownIndex(0);
-                        }
-                      }}
-                      onKeyDown={(event) => {
-                        if (!showCharacterDropdown || filteredCharacters.length === 0) return;
+            <button
+              type="button"
+              onClick={() => importFileRef.current?.click()}
+              className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
+            >
+              {t('importFile').replace('\n', ' ')}
+            </button>
 
-                        if (event.key === 'ArrowDown') {
-                          event.preventDefault();
-                          setCharacterDropdownIndex((current) => (current + 1) % Math.min(filteredCharacters.length, 10));
-                        } else if (event.key === 'ArrowUp') {
-                          event.preventDefault();
-                          setCharacterDropdownIndex((current) => {
-                            const limit = Math.min(filteredCharacters.length, 10);
-                            return (current - 1 + limit) % limit;
-                          });
-                        } else if (event.key === 'Enter') {
-                          event.preventDefault();
-                          const selected = visibleCharacterOptions[characterDropdownIndex];
-                          if (selected) {
-                            selectCharacter(selected);
-                          }
-                        } else if (event.key === 'Escape') {
-                          event.preventDefault();
-                          setShowCharacterDropdown(false);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Delay to allow click on options
-                        setTimeout(() => setShowCharacterDropdown(false), 150);
-                      }}
-                      placeholder={t('search')}
-                      className={`flex-1 mt-1 px-3 py-2 rounded-2xl border ${
-                        errors.character ? 'border-red-500' : ''
-                      }`}
-                    />
-                    {form.character && selectedCharacterEntry && (
-                      <div className="ml-2 mt-1 flex items-center gap-2">
-                        <CharacterIcon name={form.character} preferLatest language={language} />
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full border font-medium whitespace-nowrap ${
-                            selectedCharacterRowCount > 0
-                              ? 'bg-amber-100 text-amber-800 border-amber-200'
-                              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                          }`}
-                          title={
-                            selectedCharacterRowCount > 0
-                            ? formatCountLabel(language, selectedCharacterRowCount)
-                              : t('noEntries')
-                          }
-                        >
-                          {selectedCharacterRowCount > 0
-                            ? formatCountLabel(language, selectedCharacterRowCount)
-                            : t('new')}
-                        </span>
-                      </div>
-                    )}
-                    {showCharacterDropdown && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto top-full">
-                        {visibleCharacterOptions.map((name, index) => (
-                          <div
-                            key={name}
-                            ref={(node) => {
-                              characterDropdownItemRefs.current[index] = node;
-                            }}
-                            onClick={() => {
-                              selectCharacter(name);
-                            }}
-                            className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${
-                              characterDropdownIndex === index
-                                ? 'bg-gray-100'
-                                : 'hover:bg-gray-100'
-                            }`}
-                          >
-                            <CharacterIcon name={name} preferLatest language={language} />
-                            <span>{getCharacterDisplayName(name, language)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {errors.character && (
-                    <p className="text-red-500 text-xs mt-1">{errors.character}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm font-medium">{t('category')}</label>
-                  <select
-                    value={form.category}
-                    onChange={(event) => {
-                      const nextCategory = event.target.value;
-                      const nextOptions = getAvailableDetailOptions(nextCategory, form.character);
-
-                      setForm({
-                        ...form,
-                        category: nextCategory,
-                        detail: nextOptions[0] || '',
-                      });
-                    }}
-                    className="w-full mt-1 px-3 py-2 rounded-2xl border"
-                  >
-                    {CATEGORY_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {translateValue(language, CATEGORY_LABELS, option)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              {form.category !== '획득 필요' && (
-                <div>
-                    <label className="text-sm font-medium">{t('detail')}</label>
-                      <select
-                      value={formDetailValue}
-                      disabled={availableDetailOptions.length === 0}
-                      onChange={(event) => {
-                        setForm({ ...form, detail: event.target.value });
-                        if (errors.detail) {
-                          setErrors({ ...errors, detail: '' });
-                        }
-                      }}
-                      className={`w-full mt-1 px-3 py-2 rounded-2xl border ${
-                        errors.detail ? 'border-red-500' : ''
-                      }`}
-                    >
-                      {availableDetailOptions.length > 0 ? (
-                        availableDetailOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {translateValue(language, DETAIL_LABELS, option)}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="" disabled>
-                          -
-                        </option>
-                      )}
-                    </select>
-
-                    {errors.detail && (
-                      <p className="text-red-500 text-xs mt-1">{errors.detail}</p>
-                    )}
-                  </div>
-                )}
-                <button className="mff-add-button w-full px-4 py-2 rounded-2xl font-medium cursor-pointer">
-                  {t('addEntry')}
-                </button>
-              </form>
-
-              {successMessage && (
-                <div className="mt-3 px-3 py-2 rounded-2xl bg-green-50 text-green-800 border border-green-200 text-sm">
-                  {successMessage}
-                </div>
-              )}
-
-              {errors.general && (
-                <div className="mt-3 px-3 py-2 rounded-2xl bg-red-50 text-red-800 border border-red-200 text-sm">
-                  {errors.general}
-                </div>
-              )}
-            </div>
-            <div className="pt-6 border-t space-y-3">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={showDone}
-                  onChange={(event) => setShowDone(event.target.checked)}
-                />
-                {t('showCompletedEntries')}
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => importFileRef.current?.click()}
-                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer whitespace-pre-line text-center"
-                >
-                  {t('importJson')}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={exportJson}
-                  className="flex-1 px-4 py-2 rounded-2xl border cursor-pointer whitespace-pre-line text-center"
-                >
-                  {t('exportJson')}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (showResetConfirm) {
-                      resetAll();
-                    } else {
-                      setShowResetConfirm(true);
-                    }
-                  }}
-                  className={`flex-1 px-4 py-2 rounded-2xl border cursor-pointer ${
-                    showResetConfirm ? 'border-red-300 bg-red-50 text-red-700' : ''
-                  }`}
-                >
-                  {showResetConfirm ? t('resetConfirm') : t('reset')}
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-6 border-t space-y-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">{t('sanityTests')}</h2>
-                <button
-                  type="button"
-                  onClick={() => setShowSanityTests((current) => !current)}
-                  className="px-3 py-1 rounded-xl border text-sm"
-                >
-                  {showSanityTests ? t('hide') : t('show')}
-                </button>
-              </div>
-              {showSanityTests && (
-                <>
-                  <div className="text-sm text-slate-500">
-                    {passedCount}/{sanityTests.length} passed
-                  </div>
-                  <div className="space-y-2">
-                    {sanityTests.map((test) => (
-                      <div
-                        key={test.name}
-                        className={`rounded-2xl border px-3 py-2 text-sm ${test.pass ? 'bg-green-50' : 'bg-red-50'}`}
-                      >
-                        <span className="font-medium">{test.pass ? t('pass') : t('fail')}</span> — {test.name}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={exportFile}
+              className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
+            >
+              {t('exportFile').replace('\n', ' ')}
+            </button>
           </div>
 
-          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border p-5">
+          <div className="bg-white rounded-3xl shadow-sm border p-5">
               <div className="flex items-center justify-between gap-4 mb-4 flex-nowrap">
               <div className="flex items-center gap-3 min-w-0 flex-nowrap">
                 <h2 className="text-xl font-semibold whitespace-nowrap">
@@ -1604,7 +1723,7 @@ export default function MFFTrackerUI() {
                   className="w-9 h-9"
                   language={language}
                 />
-                <div className="relative w-36 max-w-[20vw] shrink-0">
+                <div className="relative flex-1 min-w-0 max-w-[28rem]">
                   <input
                     value={nameQuery}
                     onChange={(event) => setNameQuery(event.target.value)}
@@ -1619,6 +1738,14 @@ export default function MFFTrackerUI() {
                 </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
+                <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={showDone}
+                    onChange={(event) => setShowDone(event.target.checked)}
+                  />
+                  {t('showCompletedEntries')}
+                </label>
                 <span className="text-xs px-2 py-1 rounded-full bg-slate-100">
                   {translateValue(language, USAGE_LABELS, getUsageSelectionLabel(usageFilter))}
                 </span>
@@ -1626,15 +1753,12 @@ export default function MFFTrackerUI() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-500 whitespace-nowrap">{t('sortBy')}</span>
                     <select
-                      value={characterSort}
+                      value={['lastAdded', 'name', 'priority', 'completion', 'tasks'].includes(characterSort) ? characterSort : 'lastAdded'}
                       onChange={(e) => setCharacterSort(e.target.value)}
                       className="px-3 py-1 rounded-xl border text-sm"
                     >
-                      <option value="name">{t('name')}</option>
-                      <option value="origin">{t('origin')}</option>
-                      <option value="acquisition">{t('acquisition')}</option>
-                      <option value="tier">{t('tier')}</option>
                       <option value="lastAdded">{t('lastAdded')}</option>
+                      <option value="name">{t('name')}</option>
                       <option value="priority">{t('priority')}</option>
                       <option value="completion">{t('completion')}</option>
                       <option value="tasks">{t('taskCount')}</option>
@@ -1654,15 +1778,12 @@ export default function MFFTrackerUI() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-500 whitespace-nowrap">{t('sortBy')}</span>
                     <select
-                      value={rosterSort}
+                      value={['lastAdded', 'name', 'priority', 'completion', 'tasks'].includes(rosterSort) ? rosterSort : 'name'}
                       onChange={(e) => setRosterSort(e.target.value)}
                       className="px-3 py-1 rounded-xl border text-sm"
                     >
-                      <option value="name">{t('name')}</option>
-                      <option value="origin">{t('origin')}</option>
-                      <option value="acquisition">{t('acquisition')}</option>
-                      <option value="tier">{t('tier')}</option>
                       <option value="lastAdded">{t('lastAdded')}</option>
+                      <option value="name">{t('name')}</option>
                       <option value="priority">{t('priority')}</option>
                       <option value="completion">{t('completion')}</option>
                       <option value="tasks">{t('taskCount')}</option>
@@ -1753,7 +1874,12 @@ export default function MFFTrackerUI() {
                             secretDisplay
                             language={language}
                           />
-                          <PriorityBadge priority={getGroupPriority(items)} className="w-8 h-8" language={language} />
+                          <CTPPriorityBadge
+                            priority={getCharacterCtpPriority(character)}
+                            onClick={() => cycleCharacterCtpPriority(character)}
+                            className="w-8 h-8"
+                            language={language}
+                          />
                           <span className="text-xs px-2 py-1 rounded-full bg-slate-100">{formatCountLabel(language, items.length)}</span>
                         </div>
                       </div>
@@ -1832,7 +1958,12 @@ export default function MFFTrackerUI() {
                             secretDisplay
                             language={language}
                           />
-                          <PriorityBadge priority={getGroupPriority(items)} className="w-8 h-8" language={language} />
+                          <CTPPriorityBadge
+                            priority={getCharacterCtpPriority(character)}
+                            onClick={() => cycleCharacterCtpPriority(character)}
+                            className="w-8 h-8"
+                            language={language}
+                          />
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">

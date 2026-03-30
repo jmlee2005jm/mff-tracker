@@ -6,11 +6,11 @@ Marvel Future Fight tracker for managing per-character tasks in a single-page Re
 
 - Track three task categories: `유니폼 필요`, `성장 필요`, `획득 필요`
 - Store rows separately from character metadata
-- Render the same rows in `Character View` and `Category View`
-- Render a `Character List` view that shows only which characters appear in the current filtered rows
-- Character View and Character List keep separate sort controls; Character View defaults to `Last Added` and Character List defaults to `Name`
+- Render the same rows in `Character Tracking` and `Category View`
+- Render a `Tracking List` view that shows only which characters appear in the current filtered rows
+- Character Tracking and Tracking List keep separate sort controls; Character Tracking defaults to `Last Added` and Tracking List defaults to `Name`
 - Persist rows in `localStorage`
-- Support JSON import/export
+- Support file import/export
 - Show a character icon, usage badge, origin badge where applicable, acquisition badge, and upgrade badges wherever a character is rendered
 - Support a Korean default UI with an English toggle
 
@@ -29,8 +29,8 @@ Each character entry can include:
 - `slug`
 - `originType`
 - `acquisitionType` for special display-only acquisition labels
-- `ctp` for a CTP badge using one of `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `역전`, `격동`, `인내`, or `초월`
-- CTP inputs can be normalized from the English aliases `Insight`, `Conquest`, `Greed`, `Liberation`, `Rage`, `Competition`, `Destruction`, `Refinement`, `Authority`, `Judgement`, `Regeneration`, `Veteran`, `Energy`, `Patience`, and `Transcendence`
+- `ctp` for a CTP badge using one of `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `격동`, `인내`, or `초월`
+- CTP inputs can be normalized from the English aliases `Insight`, `Conquest`, `Greed`, `Liberation`, `Rage`, `Competition`, `Destruction`, `Refinement`, `Authority`, `Judgement`, `Regeneration`, `Energy`, `Patience`, and `Transcendence`
 - `iconUniformNumber` when a character needs a pinned portrait number (`0` means the base portrait)
 - `upgradeLevel` for the highest visible tier label
 - `baseUpgradeLevel` for characters whose visible tier is `4티`
@@ -48,6 +48,7 @@ Current `originType` values:
 
 Current `acquisitionType` values shown in the UI:
 
+- `공헌도`
 - `수정캐`
 - `디럭스`
 - `엑조디아`
@@ -64,10 +65,11 @@ Upgrade badges are rendered from these icons:
 
 ## Icons
 
-- Character icons come from `https://thanosvibs.money/static/assets/portraits_128/` and the icon itself opens a per-character uniform picker with `기본`, `자동`, and numbered uniforms
+- Character icons come from `https://thanosvibs.money/static/assets/portraits_128/` and the icon itself opens a per-character uniform picker with `기본`, `자동`, numbered uniforms, and a manual refresh action
 - Uniform selections are stored per character in `mff_character_uniform_overrides_v1` and can be cleared back to automatic newest resolution
 - The app checks available uniform images lazily with a timeout so the picker does not get stuck on loading
-- Resolved uniform numbers are cached in `localStorage` with `mff_latest_uniform_<slug>_v3`
+- Resolved uniform options are cached in `localStorage` with `mff_character_uniform_options_<slug>_v5`
+- The app shows a startup loading screen on a cold cache with only a Korean loading title and bar, builds the versioned uniform cache, and preloads character uniforms before rendering the tracker
 - If no icon can be resolved, the UI falls back to the character’s first letter
 
 ## Persistence
@@ -82,8 +84,8 @@ Upgrade badges are rendered from these icons:
 
 - Reset is a two-step confirmation button, not a native double-click action
 - Confirmation expires after 3 seconds
-- Reset clears rows, filters, and legacy storage keys, then writes an empty array to storage
-- Import accepts a JSON array of row-shaped objects only
+- Reset clears rows, filters, CTP overrides, and legacy storage keys, then writes an empty array to storage
+- Import accepts a file containing a JSON array of row-shaped objects only
 - Import validation is structural only; it does not verify character names or allowed detail values
 - Import accepts optional `usageType` fields and normalizes missing values
 - Existing saved rows tagged `PVE` or `PVE/PVP` are migrated once to `PVP` for the current saved dataset
@@ -109,7 +111,8 @@ Upgrade badges are rendered from these icons:
 - Name search is alias-aware, matches the character lookup rules, accepts English/slug queries, and lives in the results header next to the grouping title
 - English mode renders character names in English where the slug-based display resolver has a readable mapping
 - The main results view also shows removable filter chips for active search and metadata filters, including origin, acquisition, max tier, category, category-scoped detail, and icon-based CTP chips
-- The full filter stack lives in a left-edge drawer so the left column stays usable, and its floating edge tab only appears while the drawer is closed
+- The full filter stack lives in a right-edge drawer, and its floating edge tab only appears while the drawer is closed
+- Add Entry lives in its own drawer, launched from the right edge above Filters, and only one drawer can be open at a time
 - The Add Entry character field shows a small status chip next to the preview icon so you can tell whether the selected character already has tracked rows, and that preview defaults to the newest portrait unless you choose another uniform
 - A `!` badge beside the search bar cycles the minimum priority threshold for filtered rows
 - The character dropdown supports Arrow Up/Down and Enter selection while it is open
@@ -127,8 +130,9 @@ Upgrade badges are rendered from these icons:
 - When both toggles are off, the view shows rows with no usage type
 - The island label shows `None` when both toggles are off
 - The filter changes what is displayed, not where rows are stored
-- Add Entry has its own independent PVE/PVP toggle pair beside the title for the row being created
+- Add Entry has a two-button usage selector beside the title that toggles between PVE and PVP, with PVE as the default selection
 - Character headers show an optional CTP picker; it defaults to empty for characters without a character-level CTP value, and the trigger is styled like plain display rather than a form control
+- The badge beside that picker is separate CTP priority state, not the row/task priority used in entries
 
 ## Growth Detail Rules
 

@@ -3,7 +3,7 @@ import { characterData } from './characterData';
 export const CATEGORY_OPTIONS = ['유니폼 필요', '성장 필요', '획득 필요'];
 
 export const ORIGIN_TYPE_OPTIONS = ['전체', '일반캐', '태생캐 (2티)', '태생캐 (2티, 더블)', '태생캐 (3티)'];
-export const ACQUISITION_TYPE_OPTIONS = ['전체', '일반', '수정캐', '디럭스', '엑조디아', '매생/매엑'];
+export const ACQUISITION_TYPE_OPTIONS = ['전체', '일반', '공헌도', '수정캐', '디럭스', '엑조디아', '매생/매엑'];
 export const UPGRADE_LEVEL_OPTIONS = ['전체', '4티', '3티', '각초', '2티'];
 export const USAGE_TYPE_OPTIONS = ['전체', 'PVE', 'PVP', 'PVE/PVP', '없음'];
 export const CTP_TYPE_OPTIONS = [
@@ -18,7 +18,6 @@ export const CTP_TYPE_OPTIONS = [
   '권능',
   '심판',
   '재생',
-  '역전',
   '격동',
   '인내',
   '초월',
@@ -35,7 +34,6 @@ export const CTP_TYPE_DISPLAY_NAMES = {
   권능: '권능 / Authority',
   심판: '심판 / Judgement',
   재생: '재생 / Regeneration',
-  역전: '역전 / Veteran',
   격동: '격동 / Energy',
   인내: '인내 / Patience',
   초월: '초월 / Transcendence',
@@ -54,14 +52,13 @@ const CTP_TYPE_ALIASES = {
   judgement: '심판',
   judgment: '심판',
   regeneration: '재생',
-  veteran: '역전',
   energy: '격동',
   patience: '인내',
   transcendence: '초월',
 };
 
 export const DETAIL_OPTIONS = {
-  '유니폼 필요': ['일반', '한정'],
+  '유니폼 필요': ['상시 판매', '한정'],
   '성장 필요': ['1티→2티', '2티→3티', '2티→각초', '3티→4티', '각초→4티'],
 };
 
@@ -751,7 +748,7 @@ export function sortCharacterGroups(groups, sortBy, sortDirection = 'desc') {
       }
       case 'origin': {
         const originOrder = ['일반캐', '태생캐 (2티)', '태생캐 (2티, 더블)', '태생캐 (3티)'];
-        const acquisitionOrder = ['엑조디아', '디럭스', '수정캐', '매생/매엑', '일반'];
+        const acquisitionOrder = ['엑조디아', '디럭스', '공헌도', '수정캐', '매생/매엑', '일반'];
         const upgradeOrder = ['4티', '3티', '각초', '2티'];
 
         const originDiff =
@@ -779,7 +776,7 @@ export function sortCharacterGroups(groups, sortBy, sortDirection = 'desc') {
         break;
       }
       case 'acquisition': {
-        const acquisitionOrder = ['엑조디아', '디럭스', '수정캐', '매생/매엑', '일반', ''];
+        const acquisitionOrder = ['엑조디아', '디럭스', '공헌도', '수정캐', '매생/매엑', '일반', ''];
         const acquisitionDiff =
           getSortRank(acquisitionOrder, aMeta.acquisition) - getSortRank(acquisitionOrder, bMeta.acquisition);
         if (acquisitionDiff !== 0) {
@@ -808,7 +805,7 @@ export function sortCharacterGroups(groups, sortBy, sortDirection = 'desc') {
           break;
         }
 
-        const acquisitionOrder = ['엑조디아', '디럭스', '수정캐', '매생/매엑', '일반'];
+        const acquisitionOrder = ['엑조디아', '디럭스', '공헌도', '수정캐', '매생/매엑', '일반'];
         const acquisitionDiff =
           getSortRank(acquisitionOrder, aMeta.acquisition) - getSortRank(acquisitionOrder, bMeta.acquisition);
         if (acquisitionDiff !== 0) {
@@ -888,15 +885,15 @@ export function groupRowsByCategory(rows) {
 
 export function runSanityTests() {
   const sample = [
-    { id: 1, character: 'A', category: '유니폼 필요', detail: '일반', done: false, usageType: 'PVE', priority: 1 },
+    { id: 1, character: 'A', category: '유니폼 필요', detail: '상시 판매', done: false, usageType: 'PVE', priority: 1 },
     { id: 2, character: 'A', category: '성장 필요', detail: '1티→2티', done: true, usageType: 'PVP', priority: 2 },
     { id: 3, character: 'B', category: '획득 필요', detail: '4티', done: false, usageType: 'PVE/PVP', priority: 3 },
     { id: 4, character: 'C', category: '유니폼 필요', detail: '한정', done: false, usageType: '', priority: 0 },
   ];
 
   const prioritySample = [
-    { id: 1, character: 'A', category: '유니폼 필요', detail: '일반', done: false, usageType: '', priority: 1 },
-    { id: 2, character: 'B', category: '유니폼 필요', detail: '일반', done: false, usageType: '', priority: 3 },
+    { id: 1, character: 'A', category: '유니폼 필요', detail: '상시 판매', done: false, usageType: '', priority: 1 },
+    { id: 2, character: 'B', category: '유니폼 필요', detail: '상시 판매', done: false, usageType: '', priority: 3 },
   ];
 
   const tests = [

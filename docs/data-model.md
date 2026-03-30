@@ -32,7 +32,7 @@
 CATEGORY_OPTIONS = ['유니폼 필요', '성장 필요', '획득 필요']
 
 DETAIL_OPTIONS = {
-  '유니폼 필요': ['일반', '한정'],
+  '유니폼 필요': ['상시 판매', '한정'],
   '성장 필요': 'character-dependent'
 }
 ```
@@ -46,7 +46,7 @@ DETAIL_OPTIONS = {
 - `4티` characters show the branch that matches `baseUpgradeLevel`
 - `4티` + `3티` base uses `2티→3티` and `3티→4티`
 - `4티` + `각초` base uses `2티→각초` and `각초→4티`
-- Imported JSON is structurally validated and optional `usageType` and `priority` values are normalized during import
+- Imported files are structurally validated and optional `usageType` and `priority` values are normalized during import
 
 ## Character Metadata Shape
 
@@ -72,6 +72,7 @@ DETAIL_OPTIONS = {
 - `3티` and `각초` occupy the same display tier, so a character should only have one of them
 - `4티` is shown together with `baseUpgradeLevel`, so 4티 characters render two tier badges
 - Character-level CTP is editable from the character header, defaults to empty, and is stored separately from rows
+- Character-level CTP priority is editable from the character header, defaults to `!`, and is stored separately from rows
 
 ## Usage Model
 
@@ -83,6 +84,8 @@ DETAIL_OPTIONS = {
 - The lower floating island filters the displayed rows by `PVE` and `PVP`
 - When both island toggles are off, the view shows rows with no usage type
 - Legacy mode-bucket storage is migrated into the canonical row list on load
+- Uniform options are cached per character in `localStorage` under `mff_character_uniform_options_<slug>_v5`
+- The `자동` icon choice uses that cache and refreshes only when the cache version changes or the user explicitly refreshes a character’s uniform list
 
 ## Name Matching
 

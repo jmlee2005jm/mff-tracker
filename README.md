@@ -7,10 +7,10 @@ Marvel Future Fight tracker for managing character tasks in a compact React UI.
 ## What It Does
 
 - Tracks three task categories: `유니폼 필요`, `성장 필요`, and `획득 필요`
-- Supports `Character View`, `Category View`, and `Character List`
+- Supports `Character Tracking`, `Category View`, and `Tracking List`
 - Keeps rows separate from static character metadata
 - Saves data in `localStorage`
-- Supports JSON import and export
+- Supports file import and export
 - Includes filters for name, origin, acquisition, tier, CTP, category, detail, usage, and priority
 
 ## Sample Import
@@ -26,7 +26,7 @@ A ready-to-import example is available at [`public/sample-import.json`](./public
 
 - Character icons with per-character uniform selection
 - Tier badges for `2티`, `각초`, `3티`, and `4티`
-- Acquisition labels such as `수정캐`, `디럭스`, `엑조디아`, and `매생/매엑`
+- Acquisition labels such as `공헌도`, `수정캐`, `디럭스`, `엑조디아`, and `매생/매엑`
 - Character-level CTP display and picker
 - Row-level usage flags for `PVE` / `PVP`
 - Row priority levels from `!` to `!!!`

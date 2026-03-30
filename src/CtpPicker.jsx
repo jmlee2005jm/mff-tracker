@@ -3,6 +3,8 @@ import { CTPBadge } from './CharacterComponents';
 import { getUiText } from './i18n';
 import { CTP_TYPE_DISPLAY_NAMES, CTP_TYPE_OPTIONS } from './mffTrackerUtils';
 
+const DEFAULT_CTP_PREVIEW_ICON = 'https://thanosvibs.money/static/assets/items/6obelisk.png';
+
 export default function CtpPicker({
   value,
   onChange,
@@ -16,7 +18,23 @@ export default function CtpPicker({
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
-  const previewContent = <CTPBadge ctpType={value} className={compact ? 'w-6 h-6' : 'w-10 h-10'} />;
+  const previewContent = value ? (
+    <CTPBadge ctpType={value} className={compact ? 'w-6 h-6' : 'w-10 h-10'} />
+  ) : (
+    <span
+      className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-white shrink-0 ${
+        compact ? 'w-6 h-6' : 'w-10 h-10'
+      }`}
+      title={getUiText(language, 'none')}
+      aria-label={getUiText(language, 'none')}
+    >
+      <img
+        src={DEFAULT_CTP_PREVIEW_ICON}
+        alt=""
+        className="w-full h-full object-contain p-0.5 scale-[1.02]"
+      />
+    </span>
+  );
 
   useEffect(() => {
     if (!open || !buttonRef.current) return;
@@ -43,9 +61,25 @@ export default function CtpPicker({
     window.addEventListener('resize', handleWindowChange);
     window.addEventListener('scroll', handleWindowChange, true);
 
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        setOpen(false);
+        return;
+      }
+      if (!buttonRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('touchstart', handlePointerDown);
+
     return () => {
       window.removeEventListener('resize', handleWindowChange);
       window.removeEventListener('scroll', handleWindowChange, true);
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('touchstart', handlePointerDown);
     };
   }, [open, align]);
 
@@ -63,18 +97,14 @@ export default function CtpPicker({
         title={label || (value || getUiText(language, 'none'))}
         aria-label={label || (value || getUiText(language, 'none'))}
       >
-        {value ? (
-          previewContent
-        ) : (
-          <span className="text-[10px] font-semibold tracking-wide text-slate-500">{getUiText(language, 'ctp')}</span>
-        )}
+        {previewContent}
         {!secretDisplay && <span className="text-[10px] leading-none text-slate-400">▾</span>}
       </button>
 
       {open && (
         <div
           ref={menuRef}
-          className="z-50 rounded-2xl border bg-white shadow-2xl p-3 grid grid-cols-4 gap-2"
+          className="z-40 rounded-2xl border bg-white shadow-2xl p-3 grid grid-cols-4 gap-2"
           style={
             menuStyle || {
               position: 'fixed',

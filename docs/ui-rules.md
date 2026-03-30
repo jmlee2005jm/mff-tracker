@@ -2,16 +2,16 @@
 
 ## Layout
 
-- The page uses a two-column desktop layout with controls on the left and results on the right
-- The left control column stays sticky while scrolling on desktop and scrolls internally when needed
-- Users can switch between `Character View`, `Category View`, and `Character List`
+- The page uses a thin top utility bar, a right-side dock for Add Entry and Filters, and a main results area
+- The top utility bar holds `Show completed`, `Reset`, `File Import`, and `File Export`
+- Users can switch between `Character Tracking`, `Category View`, and `Tracking List`
 - Users can toggle between light and dark theme
 - Users can toggle between Korean and English, with Korean as the default language
 - Light theme keeps the default black borders and bright white surfaces
 - Dark theme uses gray surfaces, softened borders, and softened dark buttons instead of pure black/white contrast
 - The theme toggle is an emoji-style button that shows the current mode with a sun for light mode and a moon for dark mode, and the sun state uses a light yellow background
 - Character view defaults to sorting by `lastAdded`
-- Character view supports sorting by `name`, `origin`, `acquisition`, `tier`, `lastAdded`, `priority`, `completion`, or `tasks`
+- Character view supports sorting by `lastAdded`, `name`, `priority`, `completion`, or `tasks`
 - Character view includes a small direction toggle beside the sort dropdown
 - A small `!` priority badge sits beside the search bar and cycles the minimum priority threshold
 - Origin sorting uses origin type first, then upgrade tier, then acquisition label, then name
@@ -27,6 +27,8 @@
 - The island label shows `PVE only` or `PVP only` when exactly one toggle is on
 - When both toggles are off, the view shows only rows with no usage type
 - The bottom island changes which rows are displayed, not how rows are stored
+- Add Entry is presented in its own right-edge drawer above Filters
+- Only one drawer should be visible at a time; opening Add Entry closes Filters and opening Filters closes Add Entry
 
 ## Character Presentation
 
@@ -34,14 +36,16 @@
 - Character names should display `CharacterUpgradeBadges` when metadata exists
 - `4티` characters show the `4티` badge plus their `baseUpgradeLevel` badge
 - Character names should display `CharacterAcquisitionBadge` when acquisition metadata exists
-- Character names should display `CharacterCTPBadge` when the character metadata has a supported `ctp` subtype such as `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `역전`, `격동`, `인내`, or `초월`
+- Character names should display `CharacterCTPBadge` when the character metadata has a supported `ctp` subtype such as `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `격동`, `인내`, or `초월`
 - CTP badges are larger, borderless, and glow brightly with a type-colored shadow to signal priority
 - Character headers should include an optional CTP picker; it defaults to empty for characters without a CTP value, and the trigger should read like plain display rather than a visible form control
+- The small badge shown beside the CTP picker is separate CTP priority state, and should be labeled with `CTP` so it is not confused with row/task priority
 - Character names should display `CharacterOriginBadge` only for tier-born origin types; `일반캐` is not rendered as a badge
 - Character rows should display a priority badge that cycles through `!`, `!!`, and `!!!`
 - Row cards should display `CharacterUsageBadge` for the row-level `usageType`
-- Character icons use a dark fallback tile in light mode and a light fallback tile in dark mode; clicking the icon opens a uniform picker with `기본`, `자동`, and numbered uniforms, and add-entry previews default to the newest uniform
-- The uniform picker is driven from the character icon itself, persists per character, and keeps the base portrait available as a selectable option
+- Character icons use a dark fallback tile in light mode and a light fallback tile in dark mode; clicking the icon opens a uniform picker with `Refresh`, `기본`, `자동`, and numbered uniforms, and add-entry previews default to the newest uniform
+- The uniform picker is driven from the character icon itself, persists per character, keeps the base portrait available as a selectable option, and uses a versioned cache so a game update can invalidate the uniform list cleanly
+- The app starts with a Korean loading title and a loading bar only while the icon cache is bootstrapping
 - In `Category View`, clicking a category entry toggles its completed state directly; the row uses line-through and a soft background instead of lowering opacity, so nested controls stay readable
 - In `Category View`, entries can be dragged only within the same category to a different detail group; cross-category drops are ignored, and growth entries only accept destination detail groups that are valid for that character’s allowed growth branch
 - If icon lookup fails, show a text fallback avatar
@@ -54,6 +58,7 @@
 
 ## Acquisition Badge Styles
 
+- `공헌도` → blue
 - `수정캐` → sky
 - `디럭스` → violet with a glow
 - `엑조디아` → orange with a glow
@@ -70,8 +75,7 @@
 
 - Character input is a searchable text field with dropdown suggestions from `characterNames`
 - A character icon preview appears beside the input when the current value resolves to known metadata, and a small status chip shows whether the character already has tracked rows or is still new; the icon itself opens a uniform picker
-- Add Entry has two independent usage toggle buttons, `PVE` and `PVP`, placed beside the section title
-- When both Add Entry usage toggles are on, the row stores `PVE/PVP`
+- Add Entry has a two-button usage selector, `PVE` and `PVP`, placed beside the section title; it toggles between them and defaults to `PVE`
 - Category selection updates the available detail options
 - `성장 필요` detail options are filtered by the selected character’s origin tier and max upgrade path; a character can only use one growth branch, so `2티→3티` and `2티→각초` cannot both be valid for the same character
 - If no valid growth step remains, the detail field shows `-` and the add action is blocked
@@ -99,25 +103,19 @@
 
 - Search is split into a character name/alias field in the results header and structured metadata filters in the sidebar; origin, acquisition, max tier, and category use multi-select chip filters, detail uses category-scoped pair chips, and CTP uses icon chips
 - Visible labels, badges, and helper text should follow the current UI language where the code supports it
-- The filters live in a left-edge drawer to keep the left column from feeling overloaded, and the floating `Filters` tab only appears when the drawer is closed
+- The filters live in a right-edge drawer, and the floating `Filters` tab only appears when the drawer is closed
 - Name search matches the alias-aware character lookup rules, including English/slug queries and shared mantle aliases such as Nova, Wasp, Quasar, Captain America, Spider-Man, and Hulk
 - In English mode, visible character names should render in English via the slug-based display resolver where possible, including shared-mantle labels such as `Nova (Richard Rider)` and `Quasar (Avril Kincaid)`
 - Character search dropdown supports Arrow Up/Down and Enter selection while it is open
 - When the search matches a character with no tracked rows, character view shows a quick-add prompt that pre-fills the add form
-- Character View and Character List each have their own `Sort by` state; Character View defaults to `Last Added` and Character List defaults to `Name`
-- Character List shows only the characters present in the current filtered rows
+- Character Tracking and Tracking List each have their own `Sort by` state; Character Tracking defaults to `Last Added` and Tracking List defaults to `Name`
+- Tracking List shows only the characters present in the current filtered rows
 - Metadata search uses multi-select chip filters for origin type, acquisition label including `일반`, and max tier, plus icon chips for CTP
 - Category filters are multi-select chip groups
 - Detail filters are category-scoped pair chips and can be cleared independently
 - Usage filtering is handled separately by the floating bottom island
 - Category filter options are derived from the current rows, prefixed with `전체`
 - `Show completed entries` hides completed rows when disabled
-- Import JSON, Export JSON, and Reset actions live in the filter/utilities section
+- Reset, File import, and File export actions live in the thin top utility bar, with Reset shown first
 - Reset requires a second click within 3 seconds
 - A small credit footer appears at the bottom of the page
-
-## Embedded Sanity Tests
-
-- The sidebar has a toggleable sanity-test panel from `runSanityTests()`
-- The panel is hidden by default
-- These are UI-visible helper checks, not a full automated test suite
