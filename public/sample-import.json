@@ -14,7 +14,7 @@
       "id": 2,
       "character": "캡틴 마블",
       "category": "유니폼 필요",
-      "detail": "한정",
+      "detail": "상시 판매",
       "done": false,
       "priority": 2,
       "usageType": "PVE/PVP",
@@ -70,7 +70,7 @@
       "id": 8,
       "character": "매직",
       "category": "유니폼 필요",
-      "detail": "한정",
+      "detail": "상시 판매",
       "done": false,
       "priority": 2,
       "usageType": "PVE"
@@ -78,8 +78,14 @@
   ],
   "characterOverrides": {
     "ctp": {
-      "아이언맨": "파괴",
-      "타노스": "권능"
+      "아이언맨": {
+        "type": "파괴",
+        "rarity": "brilliant"
+      },
+      "타노스": {
+        "type": "권능",
+        "rarity": "mighty"
+      }
     },
     "ctpPriority": {
       "아이언맨": 3,

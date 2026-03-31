@@ -1,4 +1,40 @@
 export const UNIFORM_CACHE_VERSION = 'v5';
+const IMAGE_LOAD_CACHE_KEY = 'mff_loaded_image_cache_v1';
+const IMAGE_LOAD_CACHE = new Map();
+const PERSISTENT_IMAGE_LOAD_CACHE = new Set();
+let persistentImageCacheLoaded = false;
+
+function loadPersistentImageLoadCache() {
+  if (persistentImageCacheLoaded) return;
+  persistentImageCacheLoaded = true;
+
+  try {
+    const saved = window.localStorage.getItem(IMAGE_LOAD_CACHE_KEY);
+    if (!saved) return;
+
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return;
+
+    for (const src of parsed) {
+      if (typeof src === 'string' && src) {
+        PERSISTENT_IMAGE_LOAD_CACHE.add(src);
+      }
+    }
+  } catch {
+    // ignore cache load errors
+  }
+}
+
+function savePersistentImageLoadCache() {
+  try {
+    window.localStorage.setItem(
+      IMAGE_LOAD_CACHE_KEY,
+      JSON.stringify(Array.from(PERSISTENT_IMAGE_LOAD_CACHE))
+    );
+  } catch {
+    // ignore cache write errors
+  }
+}
 
 export function getBaseIconUrlBySlug(slug) {
   return `https://thanosvibs.money/static/assets/portraits_128/${slug}.png`;
@@ -15,9 +51,48 @@ export function getUniformOptionsCacheKey(slug) {
 export function preloadImage(src) {
   if (!src) return;
 
-  const img = new Image();
-  img.decoding = 'async';
-  img.src = src;
+  loadImageCached(src).catch(() => {
+    // ignore preload errors
+  });
+}
+
+export function loadImageCached(src) {
+  if (!src) {
+    return Promise.resolve(null);
+  }
+
+  loadPersistentImageLoadCache();
+
+  if (PERSISTENT_IMAGE_LOAD_CACHE.has(src)) {
+    return Promise.resolve(src);
+  }
+
+  if (IMAGE_LOAD_CACHE.has(src)) {
+    return IMAGE_LOAD_CACHE.get(src);
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => resolve(src);
+    img.onerror = () => {
+      IMAGE_LOAD_CACHE.delete(src);
+      reject(new Error(`Failed to load image: ${src}`));
+    };
+    img.src = src;
+  });
+
+  IMAGE_LOAD_CACHE.set(src, promise);
+  promise
+    .then((resolvedSrc) => {
+      PERSISTENT_IMAGE_LOAD_CACHE.add(resolvedSrc);
+      savePersistentImageLoadCache();
+      return resolvedSrc;
+    })
+    .catch(() => {
+      // ignore cache write errors
+    });
+  return promise;
 }
 
 export function imageExists(src) {
@@ -90,6 +165,17 @@ export async function warmUniformNumbersCache(slug, maxToCheck = 50) {
 export function clearUniformNumbersCache(slug) {
   try {
     window.localStorage.removeItem(getUniformOptionsCacheKey(slug));
+  } catch {
+    // ignore cache errors
+  }
+}
+
+export function clearLoadedImageCache() {
+  IMAGE_LOAD_CACHE.clear();
+  PERSISTENT_IMAGE_LOAD_CACHE.clear();
+
+  try {
+    window.localStorage.removeItem(IMAGE_LOAD_CACHE_KEY);
   } catch {
     // ignore cache errors
   }

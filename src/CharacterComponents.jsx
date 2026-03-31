@@ -18,6 +18,7 @@ import {
   clearUniformNumbersCache,
   refreshUniformNumbersCache,
   warmUniformNumbersCache,
+  loadImageCached,
 } from './iconUtils';
 
 const CHARACTER_UNIFORM_OVERRIDES_KEY = 'mff_character_uniform_overrides_v1';
@@ -65,6 +66,28 @@ function LoadingIconTile({ className = 'w-10 h-10', label = '' }) {
     >
       <span className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-sky-500 animate-spin" />
     </div>
+  );
+}
+
+function CachedImage({ src, alt, className, imageClassName, onError, title, ariaLabel }) {
+  useEffect(() => {
+    if (!src) return;
+    loadImageCached(src).catch(() => {
+      // ignore cache population errors
+    });
+  }, [src]);
+
+  return (
+    <span className={className}>
+      <img
+        src={src}
+        alt={alt}
+        className={imageClassName}
+        onError={onError}
+        title={title}
+        aria-label={ariaLabel}
+      />
+    </span>
   );
 }
 
@@ -135,16 +158,6 @@ function loadUniformOptionsCache(slug) {
   }
 }
 
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => resolve(src);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
 function saveUniformOptionsCache(slug, numbers) {
   try {
     window.localStorage.setItem(getUniformOptionsCacheKey(slug), JSON.stringify(numbers));
@@ -208,7 +221,7 @@ function CharacterIconFace({
       }
 
       try {
-        await loadImage(targetSrc);
+        await loadImageCached(targetSrc);
         if (!cancelled) {
           setSrc(targetSrc);
         }
@@ -609,7 +622,12 @@ export function CTPBadge({ ctpType, className = 'w-11 h-11' }) {
         className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-white shrink-0 cursor-help ${className} ${badgeStyle}`}
         title={CTP_TYPE_DISPLAY_NAMES[ctpType] || `CTP ${ctpType}`}
       >
-        <img src={iconSrc} alt={`CTP ${ctpType}`} className="w-full h-full object-contain p-0.5 scale-[1.02]" />
+        <CachedImage
+          src={iconSrc}
+          alt={`CTP ${ctpType}`}
+          className="w-full h-full"
+          imageClassName="w-full h-full object-contain p-0.5 scale-[1.02]"
+        />
       </span>
     );
   }
@@ -736,10 +754,11 @@ export function CharacterUpgradeBadges({ name, language = 'ko' }) {
             className={`inline-flex items-center justify-center w-8 h-8 rounded-lg shrink-0 overflow-hidden cursor-help ${styles[level] || 'bg-slate-200'}`}
             title={translateValue(language, UPGRADE_LABELS, level)}
           >
-            <img
+            <CachedImage
               src={src}
               alt={level}
-              className="w-full h-full object-contain p-0"
+              className="w-full h-full"
+              imageClassName="w-full h-full object-contain p-0"
             />
           </span>
         );

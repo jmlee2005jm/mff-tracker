@@ -10,7 +10,7 @@ Marvel Future Fight tracker for managing character tasks in a compact React UI.
 - Supports `Character Tracking`, `Category View`, and `Tracking List`
 - Keeps rows separate from static character metadata
 - Saves data in `localStorage`
-- Supports file import and export, including a wrapper export format that preserves character-level CTP, CTP priority, and artifact overrides
+- Supports file import and export, including a wrapper export format that preserves character-level CTP type and rarity, CTP priority, and artifact overrides
 - Includes filters for name, origin, acquisition, tier, CTP, category, detail, usage, and priority
 
 ## Sample Import
@@ -27,7 +27,7 @@ A ready-to-import example is available at [`public/sample-import.json`](./public
 - Character icons with per-character uniform selection
 - Tier badges for `2티`, `각초`, `3티`, and `4티`
 - Acquisition labels such as `공헌도`, `수정캐`, `디럭스`, `엑조디아`, and `매생/매엑`
-- Character-level CTP display and picker
+- Character-level CTP display and picker with Regular/Mighty/Brilliant rarity
 - Character-level artifact toggle plus star level
 - Row-level usage flags for `PVE` / `PVP`
 - Row priority levels from `!` to `!!!`

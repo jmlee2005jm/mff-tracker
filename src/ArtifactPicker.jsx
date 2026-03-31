@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getCharacterEntry } from './mffTrackerUtils';
 import { DEFAULT_ARTIFACT_PREVIEW_ICON, getArtifactIconUrlBySlug } from './iconAssets';
 import { getUiText } from './i18n';
-import { imageExists } from './iconUtils';
+import { imageExists, loadImageCached } from './iconUtils';
 
 const ARTIFACT_AVAILABILITY_CACHE = new Map();
 const ARTIFACT_AVAILABILITY_PROMISES = new Map();
@@ -12,6 +12,9 @@ function ArtifactIconImage({ src, alt, className = 'w-10 h-10' }) {
 
   useEffect(() => {
     setCurrentSrc(src);
+    loadImageCached(src).catch(() => {
+      // ignore cache population errors
+    });
   }, [src]);
 
   return (
@@ -67,12 +70,14 @@ export default function ArtifactPicker({
   const slug = entry?.slug || '';
   const isEnabled = enabled === 1;
   const [artifactAvailable, setArtifactAvailable] = useState(() => getCachedArtifactAvailability(slug));
+  const [isResolving, setIsResolving] = useState(() => Boolean(slug) && getCachedArtifactAvailability(slug) === null);
 
   useEffect(() => {
     let cancelled = false;
 
     if (!slug) {
       setArtifactAvailable(null);
+      setIsResolving(false);
       return () => {
         cancelled = true;
       };
@@ -81,15 +86,18 @@ export default function ArtifactPicker({
     const cached = getCachedArtifactAvailability(slug);
     if (cached !== null) {
       setArtifactAvailable(cached);
+      setIsResolving(false);
       return () => {
         cancelled = true;
       };
     }
 
     setArtifactAvailable(null);
+    setIsResolving(true);
     resolveArtifactAvailability(slug).then((exists) => {
       if (!cancelled) {
         setArtifactAvailable(exists);
+        setIsResolving(false);
       }
     });
 
@@ -98,23 +106,27 @@ export default function ArtifactPicker({
     };
   }, [slug]);
 
-  const canUseArtifact = artifactAvailable !== false;
-  const shouldShowArtifact = isEnabled && canUseArtifact && Boolean(slug);
+  const isLoading = Boolean(slug) && artifactAvailable === null && isResolving;
+  const shouldShowArtifact = isEnabled && artifactAvailable === true && Boolean(slug);
   const normalizedStar = shouldShowArtifact && Number.isInteger(starLevel) && starLevel >= 3 && starLevel <= 6 ? starLevel : 3;
   const iconSrc = shouldShowArtifact ? getArtifactIconUrlBySlug(slug) : DEFAULT_ARTIFACT_PREVIEW_ICON;
-  const triggerTitle = shouldShowArtifact
+  const triggerTitle = isLoading
+    ? getUiText(language, 'loading')
+    : shouldShowArtifact
     ? `${getUiText(language, 'artifact')} ${normalizedStar}`
     : artifactAvailable === false
       ? getUiText(language, 'artifactUnavailable')
       : getUiText(language, 'artifactNotNeeded');
-  const starLabel = shouldShowArtifact ? `${normalizedStar}★` : '❌';
-  const starTitle = shouldShowArtifact
+  const starLabel = isLoading ? '…' : shouldShowArtifact ? `${normalizedStar}★` : '❌';
+  const starTitle = isLoading
+    ? getUiText(language, 'loading')
+    : shouldShowArtifact
     ? `${getUiText(language, 'artifact')} ${normalizedStar}`
     : artifactAvailable === false
       ? getUiText(language, 'artifactUnavailable')
       : getUiText(language, 'artifactNotNeeded');
-  const toggleDisabled = artifactAvailable !== true && !isEnabled;
-  const starDisabled = artifactAvailable === false || (!isEnabled && artifactAvailable !== true);
+  const toggleDisabled = artifactAvailable === false || (isLoading && !isEnabled);
+  const starDisabled = artifactAvailable === false || isLoading || (!isEnabled && artifactAvailable !== true);
 
   return (
     <span className="inline-flex items-center gap-1.5 shrink-0">
@@ -154,7 +166,13 @@ export default function ArtifactPicker({
         title={triggerTitle}
         aria-label={triggerTitle}
       >
-        <ArtifactIconImage src={iconSrc} alt={name} className="w-full h-full p-0.5" />
+        {isLoading ? (
+          <span className="w-full h-full rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+            <span className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-sky-500 animate-spin" />
+          </span>
+        ) : (
+          <ArtifactIconImage src={iconSrc} alt={name} className="w-full h-full p-0.5" />
+        )}
       </button>
     </span>
   );

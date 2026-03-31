@@ -10,6 +10,10 @@ import {
   normalizeArtifactState,
 } from './artifactUtils';
 import {
+  CTP_RARITY_OPTIONS,
+  normalizeCtpSelection,
+} from './ctpStateUtils';
+import {
   CATEGORY_OPTIONS,
   ORIGIN_TYPE_OPTIONS,
   ACQUISITION_TYPE_OPTIONS,
@@ -49,6 +53,7 @@ import {
   formatCountLabel,
 } from './i18n';
 import { characterNames } from './characterData';
+import { loadImageCached } from './iconUtils';
 
 const STORAGE_KEY = 'mff_tracker_rows_v2';
 const LEGACY_STORAGE_KEY = 'mff_tracker_rows_v1';
@@ -60,7 +65,10 @@ const LEGACY_STORAGE_KEYS_BY_MODE = {
 const USAGE_FILTER_KEY = 'mff_tracker_usage_filter_v1';
 const PVP_MIGRATION_KEY = 'mff_tracker_usage_migrated_to_pvp_v1';
 const THEME_KEY = 'mff_tracker_theme_v1';
-const CHARACTER_CTP_OVERRIDES_KEY = 'mff_tracker_character_ctp_overrides_v1';
+const SHOW_ARTIFACT_KEY = 'mff_tracker_show_artifact_v1';
+const SHOW_CTP_KEY = 'mff_tracker_show_ctp_v1';
+const CHARACTER_CTP_OVERRIDES_KEY = 'mff_tracker_character_ctp_overrides_v2';
+const LEGACY_CHARACTER_CTP_OVERRIDES_KEY = 'mff_tracker_character_ctp_overrides_v1';
 const CHARACTER_CTP_PRIORITY_OVERRIDES_KEY = 'mff_tracker_character_ctp_priority_overrides_v1';
 
 function isPlainObject(value) {
@@ -71,6 +79,19 @@ function isPlainObject(value) {
 
 function sanitizeText(value) {
   return typeof value === 'string' ? value.normalize('NFKC').trim() : '';
+}
+
+function CachedIcon({ src, alt = '', className = 'w-4 h-4 shrink-0' }) {
+  useEffect(() => {
+    if (!src) return;
+    loadImageCached(src).catch(() => {
+      // ignore cache population errors
+    });
+  }, [src]);
+
+  if (!src) return null;
+
+  return <img src={src} alt={alt} className={className} />;
 }
 
 function normalizeLoadedRow(row) {
@@ -156,7 +177,7 @@ function normalizeImportedArtifactOverrides(map) {
 }
 
 function normalizeImportedCtpOverrides(map) {
-  return normalizeCharacterOverrideMap(map, normalizeCtpType);
+  return normalizeCharacterOverrideMap(map, normalizeCtpSelection);
 }
 
 function normalizeImportedCtpPriorityOverrides(map) {
@@ -258,7 +279,9 @@ function loadRows() {
 
 function loadCharacterCtpOverrides() {
   try {
-    const saved = window.localStorage.getItem(CHARACTER_CTP_OVERRIDES_KEY);
+    const saved =
+      window.localStorage.getItem(CHARACTER_CTP_OVERRIDES_KEY) ??
+      window.localStorage.getItem(LEGACY_CHARACTER_CTP_OVERRIDES_KEY);
     if (!saved) return {};
 
     const parsed = JSON.parse(saved);
@@ -267,7 +290,7 @@ function loadCharacterCtpOverrides() {
     }
 
     return Object.fromEntries(
-      Object.entries(parsed).map(([name, value]) => [name, normalizeCtpType(value)])
+      Object.entries(parsed).map(([name, value]) => [name, normalizeCtpSelection(value)])
     );
   } catch {
     return {};
@@ -416,6 +439,22 @@ export default function MFFTrackerUI({
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedDetails, setSelectedDetails] = useState([]);
   const [showDone, setShowDone] = useState(true);
+  const [showArtifactDetails, setShowArtifactDetails] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem(SHOW_ARTIFACT_KEY);
+      return saved === null ? true : saved !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [showCtpDetails, setShowCtpDetails] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem(SHOW_CTP_KEY);
+      return saved === null ? true : saved !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const [minimumPriorityFilter, setMinimumPriorityFilter] = useState(1);
   const [characterSort, setCharacterSort] = useState('lastAdded');
   const [characterSortDirection, setCharacterSortDirection] = useState('asc');
@@ -520,6 +559,22 @@ export default function MFFTrackerUI({
     return () => window.clearTimeout(timer);
   }, [transferNotice]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SHOW_ARTIFACT_KEY, String(showArtifactDetails));
+    } catch {
+      // ignore storage errors
+    }
+  }, [showArtifactDetails]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SHOW_CTP_KEY, String(showCtpDetails));
+    } catch {
+      // ignore storage errors
+    }
+  }, [showCtpDetails]);
+
   const openAddEntryDrawer = (character = '') => {
     if (!character) {
       setForm({ character: '', category: '유니폼 필요', detail: '상시 판매' });
@@ -557,6 +612,9 @@ export default function MFFTrackerUI({
       setExportSearchQuery('');
     }
   };
+
+  const shouldShowArtifactControls = showArtifactDetails;
+  const shouldShowCtpControls = showCtpDetails;
 
   const closeTransferDialog = () => {
     setShowTransferDialog(false);
@@ -683,17 +741,18 @@ export default function MFFTrackerUI({
 
   const getCharacterCtp = (character) => {
     if (Object.prototype.hasOwnProperty.call(characterCtpOverrides, character)) {
-      return normalizeCtpType(characterCtpOverrides[character]);
+      return normalizeCtpSelection(characterCtpOverrides[character]);
     }
 
-    return normalizeCtpType(getCharacterEntry(character)?.ctp);
+    return normalizeCtpSelection(getCharacterEntry(character)?.ctp);
   };
 
   const updateCharacterCtp = (character, ctp) => {
-    const nextCtp = normalizeCtpType(ctp);
+    const currentCtp = getCharacterCtp(character);
+    const nextCtp = typeof ctp === 'function' ? ctp(currentCtp) : ctp;
     setCharacterCtpOverrides((current) => ({
       ...current,
-      [character]: nextCtp,
+      [character]: normalizeCtpSelection(nextCtp),
     }));
   };
 
@@ -976,8 +1035,8 @@ export default function MFFTrackerUI({
     return filteredRows.filter((row) => {
       const entry = getCharacterEntry(row.character);
       const entryCtp = Object.prototype.hasOwnProperty.call(characterCtpOverrides, row.character)
-        ? normalizeCtpType(characterCtpOverrides[row.character])
-        : normalizeCtpType(entry?.ctp);
+        ? normalizeCtpSelection(characterCtpOverrides[row.character]).type
+        : normalizeCtpSelection(entry?.ctp).type;
       const rowDetailKey = makeDetailKey(row.category, row.detail);
 
       const matchesOrigin = originSet.size === 0 || originSet.has(entry?.originType || '');
@@ -1375,6 +1434,7 @@ export default function MFFTrackerUI({
         window.localStorage.removeItem(key);
       });
       window.localStorage.removeItem(CHARACTER_CTP_OVERRIDES_KEY);
+      window.localStorage.removeItem(LEGACY_CHARACTER_CTP_OVERRIDES_KEY);
       window.localStorage.removeItem(CHARACTER_ARTIFACT_OVERRIDES_KEY);
       window.localStorage.removeItem(CHARACTER_CTP_PRIORITY_OVERRIDES_KEY);
     } catch {
@@ -2265,13 +2325,29 @@ export default function MFFTrackerUI({
                       }
                     }}
                     placeholder={t('search')}
-                    className="w-full pl-10 pr-3 py-2 rounded-2xl border"
+                    className="w-full pl-10 pr-10 py-2 rounded-2xl border"
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
+                  {nameQuery.trim() && (
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                        setNameQuery('');
+                        setShowTrackingSearchAutocomplete(false);
+                        setTrackingSearchIndex(0);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full bg-transparent text-slate-500 hover:bg-slate-100 cursor-pointer"
+                      aria-label={t('clear')}
+                      title={t('clear')}
+                    >
+                      ×
+                    </button>
+                  )}
                   {showTrackingSearchAutocomplete && trackingSearchSuggestions.length > 0 && (
                     <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl border bg-white shadow-2xl z-40 overflow-hidden">
                       {trackingSearchSuggestions.map((suggestion, index) => (
@@ -2293,6 +2369,24 @@ export default function MFFTrackerUI({
                       ))}
                     </div>
                   )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0 pl-1">
+                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 whitespace-nowrap cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showArtifactDetails}
+                      onChange={(event) => setShowArtifactDetails(event.target.checked)}
+                    />
+                    <span>{t('artifact')}</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 whitespace-nowrap cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showCtpDetails}
+                      onChange={(event) => setShowCtpDetails(event.target.checked)}
+                    />
+                    <span>{t('ctp')}</span>
+                  </label>
                 </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
@@ -2370,7 +2464,7 @@ export default function MFFTrackerUI({
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border bg-slate-50 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer"
                   title={chip.title || chip.label}
                 >
-                  {chip.icon ? <img src={chip.icon} alt="" className="w-4 h-4 shrink-0" /> : null}
+                  {chip.icon ? <CachedIcon src={chip.icon} alt="" className="w-4 h-4 shrink-0" /> : null}
                   <span className={chip.icon ? 'sr-only' : 'whitespace-nowrap'}>{chip.label}</span>
                   <span className="text-slate-400 font-semibold">×</span>
                 </button>
@@ -2407,6 +2501,7 @@ export default function MFFTrackerUI({
                 )}
                 {displayedGroupedByCharacter.map(([character, items]) => {
                   const characterCtp = getCharacterCtp(character);
+                  const characterCtpType = characterCtp.type;
                   const characterArtifact = getCharacterArtifact(character);
                   const artifactEnabled = characterArtifact.enabled;
                   const artifactStar = characterArtifact.star;
@@ -2436,40 +2531,61 @@ export default function MFFTrackerUI({
                             </div>
                           </div>
                         <div className="flex items-center gap-2">
-                          <ArtifactPicker
-                            name={character}
-                            enabled={artifactEnabled}
-                            starLevel={artifactStar}
-                            onToggle={() =>
-                              updateCharacterArtifact(character, (current) =>
-                                current.enabled
-                                  ? createDefaultArtifactState()
-                                  : { enabled: 1, star: 3 }
-                              )
-                            }
-                            onCycleStar={() =>
-                              updateCharacterArtifact(character, (current) => ({
-                                enabled: 1,
-                                star: current.enabled && current.star >= 3 && current.star <= 5 ? current.star + 1 : 3,
-                              }))
-                            }
-                            align="right"
-                            language={language}
-                          />
-                          <CtpPicker
-                            value={characterCtp}
-                            onChange={(next) => updateCharacterCtp(character, next)}
-                            align="right"
-                            label={characterCtp || '-'}
-                            secretDisplay
-                            language={language}
-                          />
-                          <CTPPriorityBadge
-                            priority={getCharacterCtpPriority(character)}
-                            onClick={() => cycleCharacterCtpPriority(character)}
-                            className="w-8 h-8"
-                            language={language}
-                          />
+                          {shouldShowArtifactControls ? (
+                            <ArtifactPicker
+                              name={character}
+                              enabled={artifactEnabled}
+                              starLevel={artifactStar}
+                              onToggle={() =>
+                                updateCharacterArtifact(character, (current) =>
+                                  current.enabled
+                                    ? createDefaultArtifactState()
+                                    : { enabled: 1, star: 3 }
+                                )
+                              }
+                              onCycleStar={() =>
+                                updateCharacterArtifact(character, (current) => ({
+                                  enabled: 1,
+                                  star: current.enabled && current.star >= 3 && current.star <= 5 ? current.star + 1 : 3,
+                                }))
+                              }
+                              align="right"
+                              language={language}
+                            />
+                          ) : null}
+                          {shouldShowCtpControls ? (
+                            <>
+                              <CtpPicker
+                                value={characterCtp}
+                                onChange={(next) => updateCharacterCtp(character, next)}
+                                onCycleRarity={(direction = 1) =>
+                                  updateCharacterCtp(character, (current) => {
+                                    const normalized = normalizeCtpSelection(current);
+                                    const index = CTP_RARITY_OPTIONS.indexOf(normalized.rarity);
+                                    const nextIndex =
+                                      direction < 0
+                                        ? (index - 1 + CTP_RARITY_OPTIONS.length) % CTP_RARITY_OPTIONS.length
+                                        : (index + 1) % CTP_RARITY_OPTIONS.length;
+
+                                    return {
+                                      ...normalized,
+                                      rarity: CTP_RARITY_OPTIONS[nextIndex],
+                                    };
+                                  })
+                                }
+                                align="right"
+                                label={characterCtpType || '-'}
+                                secretDisplay
+                                language={language}
+                              />
+                              <CTPPriorityBadge
+                                priority={getCharacterCtpPriority(character)}
+                                onClick={() => cycleCharacterCtpPriority(character)}
+                                className="w-8 h-8"
+                                language={language}
+                              />
+                            </>
+                          ) : null}
                           <span className="text-xs px-2 py-1 rounded-full bg-slate-100">{formatCountLabel(language, items.length)}</span>
                         </div>
                       </div>
@@ -2549,6 +2665,7 @@ export default function MFFTrackerUI({
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {displayedGroupedByCharacter.map(([character, items]) => {
                   const characterCtp = getCharacterCtp(character);
+                  const characterCtpType = characterCtp.type;
                   const characterArtifact = getCharacterArtifact(character);
                   const artifactEnabled = characterArtifact.enabled;
                   const artifactStar = characterArtifact.star;
@@ -2564,40 +2681,61 @@ export default function MFFTrackerUI({
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <ArtifactPicker
-                            name={character}
-                            enabled={artifactEnabled}
-                            starLevel={artifactStar}
-                            onToggle={() =>
-                              updateCharacterArtifact(character, (current) =>
-                                current.enabled
-                                  ? createDefaultArtifactState()
-                                  : { enabled: 1, star: 3 }
-                              )
-                            }
-                            onCycleStar={() =>
-                              updateCharacterArtifact(character, (current) => ({
-                                enabled: 1,
-                                star: current.enabled && current.star >= 3 && current.star <= 5 ? current.star + 1 : 3,
-                              }))
-                            }
-                            align="right"
-                            language={language}
-                          />
-                          <CtpPicker
-                            value={characterCtp}
-                            onChange={(next) => updateCharacterCtp(character, next)}
-                            align="right"
-                            label={characterCtp || '-'}
-                            secretDisplay
-                            language={language}
-                          />
-                          <CTPPriorityBadge
-                            priority={getCharacterCtpPriority(character)}
-                            onClick={() => cycleCharacterCtpPriority(character)}
-                            className="w-8 h-8"
-                            language={language}
-                          />
+                          {shouldShowArtifactControls ? (
+                            <ArtifactPicker
+                              name={character}
+                              enabled={artifactEnabled}
+                              starLevel={artifactStar}
+                              onToggle={() =>
+                                updateCharacterArtifact(character, (current) =>
+                                  current.enabled
+                                    ? createDefaultArtifactState()
+                                    : { enabled: 1, star: 3 }
+                                )
+                              }
+                              onCycleStar={() =>
+                                updateCharacterArtifact(character, (current) => ({
+                                  enabled: 1,
+                                  star: current.enabled && current.star >= 3 && current.star <= 5 ? current.star + 1 : 3,
+                                }))
+                              }
+                              align="right"
+                              language={language}
+                            />
+                          ) : null}
+                          {shouldShowCtpControls ? (
+                            <>
+                              <CtpPicker
+                                value={characterCtp}
+                                onChange={(next) => updateCharacterCtp(character, next)}
+                                onCycleRarity={(direction = 1) =>
+                                  updateCharacterCtp(character, (current) => {
+                                    const normalized = normalizeCtpSelection(current);
+                                    const index = CTP_RARITY_OPTIONS.indexOf(normalized.rarity);
+                                    const nextIndex =
+                                      direction < 0
+                                        ? (index - 1 + CTP_RARITY_OPTIONS.length) % CTP_RARITY_OPTIONS.length
+                                        : (index + 1) % CTP_RARITY_OPTIONS.length;
+
+                                    return {
+                                      ...normalized,
+                                      rarity: CTP_RARITY_OPTIONS[nextIndex],
+                                    };
+                                  })
+                                }
+                                align="right"
+                                label={characterCtpType || '-'}
+                                secretDisplay
+                                language={language}
+                              />
+                              <CTPPriorityBadge
+                                priority={getCharacterCtpPriority(character)}
+                                onClick={() => cycleCharacterCtpPriority(character)}
+                                className="w-8 h-8"
+                                language={language}
+                              />
+                            </>
+                          ) : null}
                         </div>
                       </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2">

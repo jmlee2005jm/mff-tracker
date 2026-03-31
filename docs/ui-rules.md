@@ -14,6 +14,8 @@
 - Character view supports sorting by `lastAdded`, `name`, `priority`, `completion`, or `tasks`
 - Character view includes a small direction toggle beside the sort dropdown
 - A small `!` priority badge sits beside the search bar and cycles the minimum priority threshold
+- `Artifact` and `CTP` visibility checkboxes sit to the right of the search bar and control whether the character-header artifact picker and CTP controls are shown
+- The CTP picker shows a compact Regular/Mighty/Brilliant selector under the icon when a CTP is selected, and the selector starts at Regular
 - Origin sorting uses origin type first, then upgrade tier, then acquisition label, then name
 - Acquisition sorting groups by acquisition label first, then origin type
 - Tier sorting uses the highest visible tier first, then acquisition label
@@ -38,7 +40,7 @@
 - Character names should display `CharacterAcquisitionBadge` when acquisition metadata exists
 - Character names should display `CharacterCTPBadge` when the character metadata has a supported `ctp` subtype such as `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `격동`, `인내`, or `초월`
 - CTP badges are larger, borderless, and glow brightly with a type-colored shadow to signal priority
-- Character headers should include an optional CTP picker; it defaults to empty for characters without a CTP value, and the trigger should read like plain display rather than a visible form control
+- Character headers should include an optional CTP picker; it defaults to empty for characters without a CTP value, the trigger should read like plain display rather than a visible form control, and selected CTPs should show a compact Regular/Mighty/Brilliant selector under the icon
 - Character headers should also include an optional artifact picker to the left of CTP; it toggles between the placeholder artifact icon and the selected character artifact icon only when the artifact image exists, and shows a slightly wider star badge on the right side of the icon that cycles 3 to 6 when enabled, using a brighter yellow accent color for the enabled state and a red cross emoji when placeholder is selected
 - The small badge shown beside the CTP picker is separate CTP priority state, and should be labeled with `CTP` so it is not confused with row/task priority
 - Character names should display `CharacterOriginBadge` only for tier-born origin types; `일반캐` is not rendered as a badge
@@ -120,7 +122,7 @@
 - `Show completed entries` hides completed rows when disabled
 - Reset, File import, and File export actions live in the thin top utility bar, with Reset shown first
 - File import opens an options dialog that chooses `Merge` or `Replace`; merge import ignores conflicting rows with the same character/category/detail and shows a caution banner
-- File export opens an options dialog that can preserve the current `done` state or force all exported rows to `done: false`, and exported files should include the selected rows plus character-level CTP, CTP priority, and artifact overrides for those characters
+- File export opens an options dialog that can preserve the current `done` state or force all exported rows to `done: false`, and exported files should include the selected rows plus character-level CTP type and rarity, CTP priority, and artifact overrides for those characters
 - File export selection is grouped by character in the export dialog, starts fully selected, and lets the user search the export set before choosing rows
 - The top utility bar also shows icon-cache progress during startup and keeps a cache refresh button available afterward
 - Reset requires a second click within 3 seconds

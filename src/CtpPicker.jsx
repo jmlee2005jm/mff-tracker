@@ -3,10 +3,13 @@ import { CTPBadge } from './CharacterComponents';
 import { DEFAULT_CTP_PREVIEW_ICON } from './iconAssets';
 import { getUiText } from './i18n';
 import { CTP_TYPE_DISPLAY_NAMES, CTP_TYPE_OPTIONS } from './mffTrackerUtils';
+import { getCtpRarityLabel, normalizeCtpSelection } from './ctpStateUtils';
+import { loadImageCached } from './iconUtils';
 
 export default function CtpPicker({
   value,
   onChange,
+  onCycleRarity,
   align = 'left',
   label = '',
   compact = false,
@@ -17,11 +20,23 @@ export default function CtpPicker({
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
-  const previewContent = value ? (
-    <CTPBadge ctpType={value} className={compact ? 'w-6 h-6' : 'w-10 h-10'} />
+  const normalizedValue = normalizeCtpSelection(value);
+  const selectedType = normalizedValue.type;
+  const selectedRarity = normalizedValue.rarity;
+
+  useEffect(() => {
+    if (!selectedType) {
+      loadImageCached(DEFAULT_CTP_PREVIEW_ICON).catch(() => {
+        // ignore cache population errors
+      });
+    }
+  }, [selectedType]);
+
+  const previewContent = selectedType ? (
+    <CTPBadge ctpType={selectedType} className={compact ? 'w-6 h-6' : 'w-10 h-10'} />
   ) : (
     <span
-      className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-white shrink-0 ${
+      className={`inline-flex items-center justify-center rounded-xl overflow-hidden bg-white border border-slate-300 shadow-sm shrink-0 ${
         compact ? 'w-6 h-6' : 'w-10 h-10'
       }`}
       title={getUiText(language, 'none')}
@@ -82,23 +97,64 @@ export default function CtpPicker({
     };
   }, [open, align]);
 
+  const rarityLabel = getCtpRarityLabel(selectedRarity, language);
+  const rarityTitle = selectedType
+    ? `${CTP_TYPE_DISPLAY_NAMES[selectedType] || selectedType} · ${rarityLabel}`
+    : getUiText(language, 'none');
+
   return (
-    <div className="relative">
+    <div className="relative inline-flex flex-col items-center gap-0.5">
       <button
-      type="button"
-      ref={buttonRef}
-      onClick={() => setOpen((current) => !current)}
+        type="button"
+        ref={buttonRef}
+        onClick={() => setOpen((current) => !current)}
         className={`inline-flex items-center gap-1 text-slate-900 cursor-pointer whitespace-nowrap ${
           secretDisplay
             ? 'px-1 py-0.5 rounded-full bg-transparent shadow-none'
             : `px-3 rounded-xl border bg-white ${compact ? 'h-8' : 'h-11'}`
         }`}
-        title={label || (value || getUiText(language, 'none'))}
-        aria-label={label || (value || getUiText(language, 'none'))}
+        title={label || rarityTitle}
+        aria-label={label || rarityTitle}
       >
         {previewContent}
         {!secretDisplay && <span className="text-[10px] leading-none text-slate-400">▾</span>}
       </button>
+
+      {selectedType ? (
+        <div className="inline-flex items-center gap-0.25 rounded-full border bg-white px-0.5 py-0.5 text-[9px] leading-none shadow-sm whitespace-nowrap">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onCycleRarity?.(-1);
+            }}
+            className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+            aria-label={`${getUiText(language, 'previous')} ${rarityLabel}`}
+            title={`${getUiText(language, 'previous')} ${rarityLabel}`}
+          >
+            <svg className="w-2.25 h-2.25" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12.5 4.5 7 10l5.5 5.5" />
+            </svg>
+          </button>
+          <span className="min-w-4.5 px-0.25 text-center font-medium text-slate-700">
+            {rarityLabel}
+          </span>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onCycleRarity?.(1);
+            }}
+            className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+            aria-label={`${getUiText(language, 'next')} ${rarityLabel}`}
+            title={`${getUiText(language, 'next')} ${rarityLabel}`}
+          >
+            <svg className="w-2.25 h-2.25" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
 
       {open && (
         <div
@@ -117,7 +173,7 @@ export default function CtpPicker({
           <button
             type="button"
             onClick={() => {
-              onChange('');
+              onChange({ type: '', rarity: 'regular' });
               setOpen(false);
             }}
             className="w-12 h-12 rounded-xl border bg-slate-100 text-slate-500 text-lg font-semibold cursor-pointer flex items-center justify-center"
@@ -130,7 +186,7 @@ export default function CtpPicker({
               key={ctpType}
               type="button"
               onClick={() => {
-                onChange(ctpType);
+                onChange({ type: ctpType, rarity: 'regular' });
                 setOpen(false);
               }}
               className="w-12 h-12 rounded-xl bg-white cursor-pointer flex items-center justify-center overflow-hidden"

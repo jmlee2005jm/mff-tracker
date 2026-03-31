@@ -30,6 +30,7 @@ Each character entry can include:
 - `originType`
 - `acquisitionType` for special display-only acquisition labels
 - `ctp` for a CTP badge using one of `통찰`, `극복`, `탐욕`, `해방`, `분노`, `경쟁`, `파괴`, `제련`, `권능`, `심판`, `재생`, `격동`, `인내`, or `초월`
+- CTP character overrides also store a rarity state, cycling through Regular, Mighty, and Brilliant
 - CTP inputs can be normalized from the English aliases `Insight`, `Conquest`, `Greed`, `Liberation`, `Rage`, `Competition`, `Destruction`, `Refinement`, `Authority`, `Judgement`, `Regeneration`, `Energy`, `Patience`, and `Transcendence`
 - `artifact` for a character-level artifact picker stored as an on/off toggle plus a separate 3 to 6 star level, where the placeholder state means no artifact is selected and characters without a valid artifact image stay locked on that placeholder
 - `iconUniformNumber` when a character needs a pinned portrait number (`0` means the base portrait)
@@ -92,7 +93,7 @@ Upgrade badges are rendered from these icons:
 - Import validation is structural and semantic; invalid characters or invalid category/detail combinations are skipped
 - Import accepts optional `usageType` fields and normalizes missing values
 - Merge import matches duplicates by `character + category + detail`; conflicting imported rows are ignored and the UI shows a caution message
-- Export includes the selected rows plus character-level CTP, CTP priority, and artifact overrides for the exported characters
+- Export includes the selected rows plus character-level CTP type and rarity, CTP priority, and artifact overrides for the exported characters
 - Export lets the user keep `done` as-is or force all exported rows to `done: false`, and the export dialog starts with all rows selected
 - Existing saved rows tagged `PVE` or `PVE/PVP` are migrated once to `PVP` for the current saved dataset
 
@@ -136,7 +137,8 @@ Upgrade badges are rendered from these icons:
 - The filter changes what is displayed, not where rows are stored
 - Add Entry has a two-button usage selector beside the title that toggles between PVE and PVP, with PVE as the default selection
 - The floating usage island is exclusive and does not allow mixed toggle states
-- Character headers show an optional CTP picker; it defaults to empty for characters without a character-level CTP value, and the trigger is styled like plain display rather than a form control
+- Character headers show optional `Artifact` and `CTP` visibility checkboxes to the right of the search bar, and the preferences are stored locally
+- Character headers show an optional CTP picker; it defaults to empty for characters without a character-level CTP value, the trigger is styled like plain display rather than a form control, and enabled CTPs show a compact Regular/Mighty/Brilliant selector directly underneath the icon
 - Character headers also show an optional artifact picker to the left of CTP; it toggles between a placeholder artifact icon and the selected character artifact icon when the artifact image exists, with a slightly wider star badge on the right side of the icon that cycles 3 to 6 when enabled and shows a red cross emoji when the placeholder is selected
 - The badge beside that picker is separate CTP priority state, not the row/task priority used in entries
 
