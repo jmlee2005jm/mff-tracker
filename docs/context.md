@@ -11,6 +11,7 @@ Marvel Future Fight tracker for managing per-character tasks in a single-page Re
 - Character Tracking and Tracking List keep separate sort controls; Character Tracking defaults to `Last Added` and Tracking List defaults to `Name`
 - Persist rows in `localStorage`
 - Support file import/export with an option dialog: import can `Merge` or `Replace`, and export can preserve `done` state or force all exported rows to `done: false`; exported files use a wrapper object that can carry row data plus character-level overrides
+- Import/export dialogs close when the user clicks outside the modal region
 - Show a character icon, usage badge, origin badge where applicable, acquisition badge, and upgrade badges wherever a character is rendered
 - Support a Korean default UI with an English toggle
 
@@ -117,6 +118,7 @@ Upgrade badges are rendered from these icons:
 - Character search and metadata filters are separate in the UI
 - Name search is alias-aware, matches the character lookup rules, accepts English/slug queries, and lives in the results header next to the grouping title
 - English mode renders character names in English where the slug-based display resolver has a readable mapping
+- On a fresh empty tracker, semi-transparent onboarding tips appear next to Add Entry, Filters, the search bar, and the top utility area; clicking a hint dismisses only that tip, and the help button toggles the hints on or off at once
 - The main results view also shows removable filter chips for active search and metadata filters, including origin, acquisition, max tier, category, category-scoped detail, and icon-based CTP chips
 - The full filter stack lives in a right-edge drawer, and its floating edge tab only appears while the drawer is closed
 - Add Entry lives in its own drawer, launched from the right edge above Filters, and only one drawer can be open at a time

@@ -4,11 +4,13 @@
 
 - The page uses a thin top utility bar, a right-side dock for Add Entry and Filters, and a main results area
 - The top utility bar holds `Show completed`, `Reset`, `File Import`, and `File Export`
+- On a fresh empty tracker, semi-transparent onboarding tips appear next to Add Entry, Filters, the search bar, and the top utility area; clicking a hint dismisses only that tip, and the help button toggles all tips on or off at once
 - Users can switch between `Character Tracking`, `Category View`, and `Tracking List`
 - Users can toggle between light and dark theme
 - Users can toggle between Korean and English, with Korean as the default language
 - Light theme keeps the default black borders and bright white surfaces
 - Dark theme uses gray surfaces, softened borders, and softened dark buttons instead of pure black/white contrast
+- The help button sits immediately left of the theme toggle and toggles the onboarding hints on or off
 - The theme toggle is an emoji-style button that shows the current mode with a sun for light mode and a moon for dark mode, and the sun state uses a light yellow background
 - Character view defaults to sorting by `lastAdded`
 - Character view supports sorting by `lastAdded`, `name`, `priority`, `completion`, or `tasks`
@@ -124,6 +126,7 @@
 - File import opens an options dialog that chooses `Merge` or `Replace`; merge import ignores conflicting rows with the same character/category/detail and shows a caution banner
 - File export opens an options dialog that can preserve the current `done` state or force all exported rows to `done: false`, and exported files should include the selected rows plus character-level CTP type and rarity, CTP priority, and artifact overrides for those characters
 - File export selection is grouped by character in the export dialog, starts fully selected, and lets the user search the export set before choosing rows
+- Import/export dialogs close when the user clicks outside the modal region
 - The top utility bar also shows icon-cache progress during startup and keeps a cache refresh button available afterward
 - Reset requires a second click within 3 seconds
 - A small credit footer appears at the bottom of the page

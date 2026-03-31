@@ -67,6 +67,7 @@ const PVP_MIGRATION_KEY = 'mff_tracker_usage_migrated_to_pvp_v1';
 const THEME_KEY = 'mff_tracker_theme_v1';
 const SHOW_ARTIFACT_KEY = 'mff_tracker_show_artifact_v1';
 const SHOW_CTP_KEY = 'mff_tracker_show_ctp_v1';
+const ONBOARDING_GUIDE_KEY = 'mff_tracker_onboarding_guide_dismissed_v1';
 const CHARACTER_CTP_OVERRIDES_KEY = 'mff_tracker_character_ctp_overrides_v2';
 const LEGACY_CHARACTER_CTP_OVERRIDES_KEY = 'mff_tracker_character_ctp_overrides_v1';
 const CHARACTER_CTP_PRIORITY_OVERRIDES_KEY = 'mff_tracker_character_ctp_priority_overrides_v1';
@@ -92,6 +93,50 @@ function CachedIcon({ src, alt = '', className = 'w-4 h-4 shrink-0' }) {
   if (!src) return null;
 
   return <img src={src} alt={alt} className={className} />;
+}
+
+function OnboardingTip({ children, className = '', onClick, onDismiss, hoverDismissMs = 1500 }) {
+  const hoverTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        window.clearTimeout(hoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    if (!onDismiss) return;
+
+    if (hoverTimerRef.current) {
+      window.clearTimeout(hoverTimerRef.current);
+    }
+
+    hoverTimerRef.current = window.setTimeout(() => {
+      hoverTimerRef.current = null;
+      onDismiss();
+    }, hoverDismissMs);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`rounded-2xl border border-sky-300 bg-sky-50/95 px-4 py-3 text-left text-sm text-sky-950 shadow-xl backdrop-blur-sm cursor-pointer ${className}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function normalizeLoadedRow(row) {
@@ -455,6 +500,14 @@ export default function MFFTrackerUI({
       return true;
     }
   });
+  const [showOnboardingGuide, setShowOnboardingGuide] = useState(() => {
+    try {
+      return rows.length === 0 && window.localStorage.getItem(ONBOARDING_GUIDE_KEY) !== 'dismissed';
+    } catch {
+      return rows.length === 0;
+    }
+  });
+  const [dismissedHintKeys, setDismissedHintKeys] = useState([]);
   const [minimumPriorityFilter, setMinimumPriorityFilter] = useState(1);
   const [characterSort, setCharacterSort] = useState('lastAdded');
   const [characterSortDirection, setCharacterSortDirection] = useState('asc');
@@ -505,6 +558,7 @@ export default function MFFTrackerUI({
   const rightDockHideTimerRef = useRef(null);
   const addDrawerRef = useRef(null);
   const filtersDrawerRef = useRef(null);
+  const transferDialogRef = useRef(null);
   const addDockButtonRef = useRef(null);
   const filtersDockButtonRef = useRef(null);
   const [characterCtpPriorityOverrides, setCharacterCtpPriorityOverrides] = useState(() => loadCharacterCtpPriorityOverrides());
@@ -558,6 +612,29 @@ export default function MFFTrackerUI({
 
     return () => window.clearTimeout(timer);
   }, [transferNotice]);
+
+  const toggleOnboardingGuide = () => {
+    const shouldShowAll = !showOnboardingGuide || dismissedHintKeys.length > 0;
+
+    setShowOnboardingGuide(shouldShowAll);
+    setDismissedHintKeys([]);
+
+    try {
+      if (shouldShowAll) {
+        window.localStorage.removeItem(ONBOARDING_GUIDE_KEY);
+      } else {
+        window.localStorage.setItem(ONBOARDING_GUIDE_KEY, 'dismissed');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const dismissHint = (key) => {
+    setDismissedHintKeys((current) => (current.includes(key) ? current : [...current, key]));
+  };
+
+  const showHint = (key) => showOnboardingGuide && !dismissedHintKeys.includes(key);
 
   useEffect(() => {
     try {
@@ -738,6 +815,29 @@ export default function MFFTrackerUI({
       document.removeEventListener('pointerdown', handlePointerDown, true);
     };
   }, [showAddDrawer, showFiltersDrawer]);
+
+  useEffect(() => {
+    if (!showTransferDialog) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      const dialogRoot = transferDialogRef.current;
+
+      if (!dialogRoot || (target instanceof Element && dialogRoot.contains(target))) {
+        return;
+      }
+
+      closeTransferDialog();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [showTransferDialog]);
 
   const getCharacterCtp = (character) => {
     if (Object.prototype.hasOwnProperty.call(characterCtpOverrides, character)) {
@@ -1062,8 +1162,13 @@ export default function MFFTrackerUI({
   const ctpFilteredRows = useMemo(() => metadataFilteredRows, [metadataFilteredRows]);
 
   const priorityFilteredRows = useMemo(
-    () => ctpFilteredRows.filter((row) => normalizePriority(row.priority) >= minimumPriorityFilter),
-    [ctpFilteredRows, minimumPriorityFilter]
+    () =>
+      ctpFilteredRows.filter((row) => {
+        const rowPriority = normalizePriority(row.priority);
+        const ctpPriority = getCharacterCtpPriority(row.character);
+        return Math.max(rowPriority, ctpPriority) >= minimumPriorityFilter;
+      }),
+    [ctpFilteredRows, minimumPriorityFilter, characterCtpPriorityOverrides]
   );
 
   const activeFilterChips = useMemo(() => {
@@ -1584,6 +1689,19 @@ export default function MFFTrackerUI({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                onClick={toggleOnboardingGuide}
+                className={`w-11 h-11 rounded-full border flex items-center justify-center text-base font-semibold shadow-sm ${
+                  theme === 'dark'
+                    ? 'bg-slate-900 text-sky-200 border-slate-700'
+                    : 'bg-sky-50 text-sky-700 border-sky-200'
+                }`}
+                title={t('help')}
+                aria-label={t('help')}
+              >
+                ?
+              </button>
+              <button
+                type="button"
                 onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -1642,6 +1760,7 @@ export default function MFFTrackerUI({
           type="button"
           ref={filtersDockButtonRef}
           onClick={() => {
+            dismissHint('filters');
             setShowAddDrawer(false);
             setShowFiltersDrawer(true);
           }}
@@ -1657,11 +1776,24 @@ export default function MFFTrackerUI({
         >
           {t('filters')}
         </button>
+        {showHint('filters') && !showAddDrawer && !showFiltersDrawer && (
+          <OnboardingTip
+            onClick={() => dismissHint('filters')}
+            onDismiss={() => dismissHint('filters')}
+            className="fixed right-[8.5rem] top-[36.5%] w-[16rem] z-[65]"
+          >
+            <div className="font-semibold">{t('onboardingFilters')}</div>
+            <div className="mt-1 text-[11px] leading-relaxed text-sky-800/90">
+              {t('onboardingFiltersBody')}
+            </div>
+          </OnboardingTip>
+        )}
 
         <button
           type="button"
           ref={addDockButtonRef}
           onClick={() => {
+            dismissHint('addEntry');
             openAddEntryDrawer();
           }}
           onMouseEnter={openRightDock}
@@ -1676,6 +1808,18 @@ export default function MFFTrackerUI({
         >
           {t('addEntry')}
         </button>
+        {showHint('addEntry') && !showAddDrawer && !showFiltersDrawer && (
+          <OnboardingTip
+            onClick={() => dismissHint('addEntry')}
+            onDismiss={() => dismissHint('addEntry')}
+            className="fixed right-[8.5rem] top-[28%] w-[16rem] z-[60]"
+          >
+            <div className="font-semibold">{t('onboardingAddEntry')}</div>
+            <div className="mt-1 text-[11px] leading-relaxed text-sky-800/90">
+              {t('noTrackedEntries')}
+            </div>
+          </OnboardingTip>
+        )}
 
         <div
           ref={addDrawerRef}
@@ -1695,6 +1839,7 @@ export default function MFFTrackerUI({
                     key={label}
                     type="button"
                     onClick={() => {
+                      dismissHint('addEntry');
                       setEntryUsageSelection((current) => {
                         const nextValue =
                           label === 'PVE'
@@ -1740,6 +1885,7 @@ export default function MFFTrackerUI({
               <label className="text-sm font-medium">{t('character')}</label>
                     <div className="relative flex items-center gap-2">
                       <input
+                        onFocus={() => dismissHint('search')}
                   value={form.character}
                   onChange={(event) => {
                     const value = event.target.value;
@@ -2216,13 +2362,30 @@ export default function MFFTrackerUI({
                 {t('importFile').replace('\n', ' ')}
               </button>
 
-              <button
-                type="button"
-                onClick={() => openTransferDialog('export')}
-                className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
-              >
-                {t('exportFile').replace('\n', ' ')}
-              </button>
+              <div className="relative inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    dismissHint('export');
+                    openTransferDialog('export');
+                  }}
+                  className="px-4 py-2 rounded-2xl border cursor-pointer whitespace-nowrap"
+                >
+                  {t('exportFile').replace('\n', ' ')}
+                </button>
+                {showHint('export') && (
+                  <OnboardingTip
+                    onClick={() => dismissHint('export')}
+                    onDismiss={() => dismissHint('export')}
+                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 w-[16rem]"
+                  >
+                    <div className="font-semibold">{t('onboardingExport')}</div>
+                    <div className="mt-1 text-[11px] leading-relaxed text-sky-800/90">
+                      {t('onboardingExportBody')}
+                    </div>
+                  </OnboardingTip>
+                )}
+              </div>
             </div>
 
             <div className="ml-auto flex items-center gap-2 rounded-2xl border bg-slate-50 px-4 py-2.5">
@@ -2324,6 +2487,7 @@ export default function MFFTrackerUI({
                         setShowTrackingSearchAutocomplete(false);
                       }
                     }}
+                    onFocus={() => dismissHint('search')}
                     placeholder={t('search')}
                     className="w-full pl-10 pr-10 py-2 rounded-2xl border"
                   />
@@ -2368,6 +2532,18 @@ export default function MFFTrackerUI({
                         </button>
                       ))}
                     </div>
+                  )}
+                  {showHint('search') && (
+                    <OnboardingTip
+                      onClick={() => dismissHint('search')}
+                      onDismiss={() => dismissHint('search')}
+                      className="absolute left-0 right-0 top-full mt-2"
+                    >
+                      <div className="font-semibold">{t('onboardingSearch')}</div>
+                      <div className="mt-1 text-[11px] leading-relaxed text-sky-800/90">
+                        트래커에서 원하는 캐릭터를 검색하세요
+                      </div>
+                    </OnboardingTip>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 pl-1">
@@ -2586,7 +2762,6 @@ export default function MFFTrackerUI({
                               />
                             </>
                           ) : null}
-                          <span className="text-xs px-2 py-1 rounded-full bg-slate-100">{formatCountLabel(language, items.length)}</span>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -2677,7 +2852,6 @@ export default function MFFTrackerUI({
                           <CharacterIcon name={character} theme={theme} language={language} />
                           <div className="min-w-0">
                             <div className="font-semibold truncate">{getCharacterDisplayName(character, language)}</div>
-                            <div className="text-xs text-slate-500">{formatCountLabel(language, items.length)}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -2906,7 +3080,7 @@ export default function MFFTrackerUI({
 
         {showTransferDialog && transferDialogKind && (
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/40">
-            <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border p-6 space-y-4">
+            <div ref={transferDialogRef} className="w-full max-w-md rounded-3xl bg-white shadow-2xl border p-6 space-y-4">
               <div>
                 <div className="flex items-center gap-3">
                   <h3 className="text-xl font-semibold">
